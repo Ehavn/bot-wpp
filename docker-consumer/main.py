@@ -45,9 +45,12 @@ def callback(ch, method, properties, body):
         msg = json.loads(body)
         logger.info(f"Mensagem recebida: {msg}")
 
+        # Adiciona status "pending"
+        msg["status"] = "pending"
+
         # Salva mensagem diretamente na coleção raw
         collection_raw.insert_one(msg)
-        logger.info("Mensagem inserida no MongoDB Atlas!")
+        logger.info("Mensagem inserida no MongoDB Atlas com status pending!")
 
     except Exception as e:
         logger.error(f"Erro ao inserir no MongoDB: {e}")
@@ -55,6 +58,7 @@ def callback(ch, method, properties, body):
     finally:
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
+# Inicia consumidor
 channel.basic_consume(queue=QUEUE_NAME, on_message_callback=callback)
 
 logger.info("Consumidor iniciado, aguardando mensagens...")
