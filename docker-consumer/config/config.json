@@ -1,0 +1,13 @@
+{
+  "rabbitmq": {
+    "host": "localhost",
+    "user": "admin",
+    "password": "admin",
+    "queue": "incoming_messages"
+  },
+  "mongo": {
+    "connectionUri": "mongodb+srv://ehavn:1951@cluster-chatbot.npckgpy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster-chatbot",
+    "db_name": "messages",
+    "collection_raw": "raw"
+  }
+}
