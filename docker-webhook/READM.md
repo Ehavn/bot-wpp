@@ -1,125 +1,112 @@
-# Webhook para Enfileiramento de Mensagens
-Este projeto é uma API de webhook construída com Flask. Sua principal função é receber requisições HTTP POST, extrair as mensagens de um payload JSON e publicá-las de forma assíncrona em uma fila do RabbitMQ para processamento posterior.
+# 📲 WhatsApp Chatbot Webhook
 
-## 📜 Descrição
-A aplicação atua como um ponto de entrada (endpoint) para webhooks, como os enviados por plataformas de mensagens (ex: WhatsApp Business API). Ela foi projetada para receber dados, validar a presença de mensagens no corpo da requisição e, em seguida, enfileirar cada mensagem individualmente no RabbitMQ. Isso garante que as mensagens recebidas não sejam perdidas e possam ser processadas por serviços consumidores de forma desacoplada e escalável.
+Este projeto implementa um **webhook em Flask** que recebe mensagens do WhatsApp e as publica em uma fila **RabbitMQ**, onde outros serviços (como sanitização, IA e armazenamento) podem consumir e processar os dados.
 
-## ✨ Funcionalidades
-Endpoint HTTP: Expõe um endpoint (/) que aceita requisições do tipo POST.
+---
 
-Publicação em Fila: Conecta-se a um servidor RabbitMQ e publica mensagens em uma fila pré-configurada.
+## 📂 Estrutura do Projeto
 
-Mensagens Persistentes: As mensagens são publicadas no RabbitMQ com modo de entrega persistente, o que significa que elas serão salvas em disco e sobreviverão a reinicializações do broker.
-
-Configuração Centralizada: As configurações do RabbitMQ e do servidor Flask são gerenciadas através do arquivo config/config.json.
-
-
-Pronto para Contêineres: Inclui um Dockerfile para facilitar o build e o deploy da aplicação. 
-
-## 🛠️ Tecnologias Utilizadas
-Python 3.11
+DOCKER-WEBHOOK/
+│── config/
+│ └── config.json # Configurações do projeto
+│── src/
+│ ├── app.py # Flask App (Webhook principal)
+│ ├── rabbitmq.py # Funções de integração com RabbitMQ
+│ └── utils.py # Funções auxiliares (validação, logs)
+│── requirements.txt # Dependências Python
+│── Dockerfile # Build do container
+│── README.md # Este arquivo :)
 
 
-Flask: Micro-framework web para criar o endpoint do webhook. 
+---
 
+## 🚀 Como funciona
 
-Pika: Biblioteca para comunicação com o RabbitMQ. 
+1. O **Flask (app.py)** expõe um endpoint `/` que recebe mensagens do WhatsApp.
+2. Cada mensagem recebida é validada e publicada em uma fila no **RabbitMQ**.
+3. O **RabbitMQ** garante persistência e distribuição das mensagens para serviços consumidores (workers).
+4. Futuramente, workers podem:
+   - Armazenar mensagens no **MongoDB** (RAW e sanitizadas).
+   - Salvar relatórios e leads no **Postgres**.
+   - Invocar a **IA (Gemini)** para responder conversas.
 
-Docker: Para containerização da aplicação.
+---
 
 ## ⚙️ Configuração
-Antes de executar o projeto, você precisa configurar as credenciais de acesso ao RabbitMQ e as configurações do servidor Flask.
 
-Crie uma pasta chamada config.
+### Arquivo `config/config.json`
 
-Dentro de config/, crie o arquivo config.json com o seguinte conteúdo:
-
-JSON
-
+```json
 {
   "rabbitmq": {
     "host": "localhost",
-    "user": "admin",
-    "password": "admin",
-    "queue": "incoming_messages"
+    "user": "guest",
+    "password": "guest",
+    "queue": "whatsapp_queue"
   },
   "flask": {
     "port": 5000,
     "debug": true
   }
 }
-rabbitmq: Contém os dados de conexão com o servidor RabbitMQ.
+🔒 Em produção, recomenda-se usar variáveis de ambiente em vez de config.json.
 
-flask: Define a porta e o modo de depuração do servidor Flask.
+🐳 Rodando com Docker
+Build da imagem
+docker build -t whatsapp-webhook .
 
-## 🚀 Como Executar
-Você pode executar o projeto localmente com Python ou utilizando Docker.
+Rodar o container
+docker run -d \
+  --name whatsapp-webhook \
+  -p 5000:5000 \
+  --env RABBIT_HOST=host.docker.internal \
+  --env RABBIT_USER=guest \
+  --env RABBIT_PASS=guest \
+  --env RABBIT_QUEUE=whatsapp_queue \
+  whatsapp-webhook
 
-Pré-requisitos
-Python 3.11 ou superior
+📬 Testando o Webhook
 
-Docker (para a opção com contêiner)
+Envie um POST para o endpoint:
 
-Um servidor RabbitMQ em execução
+curl -X POST http://localhost:5000/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "value": {
+      "messages": [
+        {"id": "msg1", "from": "5511999999999", "text": {"body": "Olá"}}
+      ]
+    }
+  }'
 
-### 1. Execução Local
-Bash
 
-- 1. Clone o repositório
-git clone <url-do-seu-repositorio>
-cd <nome-do-repositorio>
-
-- 2. Crie e ative um ambiente virtual (recomendado)
-python -m venv venv
-source venv/bin/activate  # No Windows: venv\Scripts\activate
-
-- 3. Instale as dependências
-pip install -r requirements.txt
-
-- 4. Inicie o servidor Flask
-python main.py
-O servidor estará em execução em http://localhost:5000.
-
-### 2. Execução com Docker
-Bash
-
-- 1. Clone o repositório
-git clone <url-do-seu-repositorio>
-cd <nome-do-repositorio>
-
-- 2. Construa a imagem Docker
-docker build -t webhook-produtor .
-
-- 3. Execute o contêiner, mapeando a porta
-docker run --name meu-webhook -p 5000:5000 -d webhook-produtor
-
-## 📝 Exemplo de Uso
-Envie uma requisição POST para http://localhost:5000/ com um corpo JSON no seguinte formato:
-
-JSON
+Resposta esperada:
 
 {
-  "value": {
-    "messages": [
-      {
-        "from": "1234567890",
-        "id": "wamid.ID",
-        "text": {
-          "body": "Olá, mundo!"
-        },
-        "timestamp": "1678886400",
-        "type": "text"
-      },
-      {
-        "from": "0987654321",
-        "id": "wamid.ID2",
-        "text": {
-          "body": "Segunda mensagem"
-        },
-        "timestamp": "1678886401",
-        "type": "text"
-      }
-    ]
-  }
+  "status": "ok",
+  "count": 1
 }
-A API responderá com {"status": "ok"} e as duas mensagens serão publicadas na fila incoming_messages do RabbitMQ.
+
+
+E a mensagem aparecerá no RabbitMQ.
+
+🔮 Próximos passos
+
+Implementar worker consumidor que lê mensagens da fila.
+
+Armazenar mensagens RAW e sanitizadas em MongoDB.
+
+Salvar leads e relatórios em Postgres.
+
+Integrar IA (Gemini) para respostas automáticas.
+
+Configurar docker-compose.yml para orquestrar Webhook + RabbitMQ + Workers.
+
+📜 Licença
+
+Projeto interno para estudo e prototipagem.
+
+
+---
+
+👉 Quer que eu já adicione ao README um **docker-compose.yml de exemplo** (Webhook + RabbitMQ), assim você consegue subir tudo com um único `docker compose up`?

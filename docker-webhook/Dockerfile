@@ -10,15 +10,18 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copia arquivos do projeto
-COPY requirements.txt ./
-COPY main.py ./
-COPY logger.py ./
-COPY utils/ ./utils/
-COPY config/ ./config/
+# Copia apenas requirements primeiro (para otimizar cache do Docker)
+COPY requirements.txt .
 
-# Instala as dependências Python
+# Instala dependências Python
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Comando que inicia o consumidor
-CMD ["python", "main.py"]
+# Copia os arquivos do projeto
+COPY config/ ./config/
+COPY src/ ./src/
+
+# Expõe a porta do Flask
+EXPOSE 5000
+
+# Comando que inicia a aplicação Flask (equivalente ao seu antigo main.py)
+CMD ["python", "src/app.py"]

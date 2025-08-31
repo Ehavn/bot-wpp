@@ -1,2 +1,2 @@
-flask[srv]
-pika[srv]
+flask==3.0.0
+pika==1.3.2
