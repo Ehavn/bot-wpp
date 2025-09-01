@@ -1,0 +1,17 @@
+{
+  "gemini": {
+    "api_key": "AIzaSyAGxfC7TQ-jPxnsBhW2EDZ5UIPi5cTW0PA"
+  },
+  "whatsapp": {
+    "token": "EAA8c9oS34F4BPG66Uj1wTXP2aq8wojlkk3HmaF3CZCw9hjYtmKSRp6G6ZCLFv2ZCoLPns5v8XAIBiFeZAzMljKY5xFI1LhH4s3GsYB0oDsr6jtXVSDhYofoYoBvBVDwLBdZBZBFDkXAIfry9b7e0yei71nDoGwshPi4VQKRnjTtK14PRomYZA45bjBoZCxrI0uZBlW7WCodvfhy6FO7bhOiBA8dKpovNxU7lDaOohUovpZCPyiJcsZD",
+    "phone_number_id": "744187182111085",
+    "to_phone_number": "5551993623547"
+  },
+  "rabbitmq": {
+    "host": "localhost",
+    "user": "admin",
+    "password": "admin",
+    "queue": "ia_messages"
+  },
+  "pdfs_path": "documentos/pdfs"
+}
