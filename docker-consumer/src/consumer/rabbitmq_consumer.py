@@ -1,8 +1,9 @@
 import pika
 import json
 import time
-from .mongo_client import get_mongo_client
-from .logger import get_logger
+from datetime import datetime
+from ..utils.mongo_client import get_mongo_client
+from ..utils.logger import get_logger
 
 logger = get_logger("consumer")
 
@@ -11,6 +12,7 @@ def start_consumer(rabbit_config):
     RABBIT_USER = rabbit_config["user"]
     RABBIT_PASS = rabbit_config["password"]
     QUEUE_NAME = rabbit_config["queue"]
+    QUEUE_ERROR = rabbit_config.get("queue_error", "failed_messages")  # fila de erro
 
     # Conexão com MongoDB
     mongo_client, mongo_config = get_mongo_client()
@@ -27,6 +29,7 @@ def start_consumer(rabbit_config):
             connection = pika.BlockingConnection(parameters)
             channel = connection.channel()
             channel.queue_declare(queue=QUEUE_NAME, durable=True)
+            channel.queue_declare(queue=QUEUE_ERROR, durable=True)
             break
         except Exception as e:
             logger.warning(f"Aguardando RabbitMQ... {e}")
@@ -42,14 +45,25 @@ def start_consumer(rabbit_config):
 
             # Adiciona status e timestamp
             msg["status"] = "pending"
-            msg["created_at"] = datetime.utcnow()  # timestamp em UTC
+            msg["created_at"] = datetime.utcnow()
 
-            # msg["created_at"] = datetime.utcnow()  # alternativa de nome
             collection_raw.insert_one(msg)
             logger.info("Mensagem inserida no MongoDB com status 'pending'!")
 
         except Exception as e:
-            logger.error(f"Erro ao inserir no MongoDB: {e}")
+            logger.error(f"Erro ao processar mensagem: {e}")
+            # Reenvia mensagem para a fila de erro
+            try:
+                channel.basic_publish(
+                    exchange="",
+                    routing_key=QUEUE_ERROR,
+                    body=body,
+                    properties=pika.BasicProperties(delivery_mode=2)  # persistente
+                )
+                logger.warning("Mensagem redirecionada para a fila de erro!")
+            except Exception as publish_err:
+                logger.critical(f"Falha ao redirecionar para fila de erro: {publish_err}")
+
         finally:
             ch.basic_ack(delivery_tag=method.delivery_tag)
 

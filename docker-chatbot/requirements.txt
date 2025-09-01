@@ -1,10 +1,4 @@
-<<<<<<< HEAD
-pymongo[srv]
-google.generativeai[srv]
-psycopg2[srv]
-=======
-pymongo[srv]
-google.generativeai[srv]
-psycopg2[srv]
->>>>>>> cccf66339631c294e783b616174331c055f49216
-requests[srv]
+pika
+google-generativeai
+requests
+pdfplumber

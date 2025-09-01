@@ -1,6 +1,6 @@
 import json
-from src.consumer.rabbitmq_consumer import start_consumer
-from src.utils.logger import get_logger
+from src.rabbitmq_consumer import start_consumer
+from src.logger import get_logger
 
 logger = get_logger("app")
 
