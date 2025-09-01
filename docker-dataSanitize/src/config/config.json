@@ -11,5 +11,10 @@
     "user": "",
     "password": "",
     "database": ""
+  },
+  "rabbitmq": {
+    "host": "localhost",
+    "queue_new_messages": "new_messages",
+    "queue_ia_messages": "ia_messages"
   }
 }
