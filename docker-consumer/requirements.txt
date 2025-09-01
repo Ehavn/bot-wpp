@@ -1,2 +1,6 @@
+<<<<<<< HEAD
 flask[srv]
+=======
+flask[srv]
+>>>>>>> cccf66339631c294e783b616174331c055f49216
 pika[srv]

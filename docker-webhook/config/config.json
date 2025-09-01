@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 {
   "rabbitmq": {
     "host": "localhost",
@@ -10,3 +11,17 @@
     "debug": true
   }
 }
+=======
+{
+  "rabbitmq": {
+    "host": "localhost",
+    "user": "admin",
+    "password": "admin",
+    "queue": "incoming_messages"
+  },
+  "flask": {
+    "port": 5000,
+    "debug": true
+  }
+}
+>>>>>>> cccf66339631c294e783b616174331c055f49216

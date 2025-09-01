@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 {
   "gemini": {
     "api_key": "AIzaSyAGxfC7TQ-jPxnsBhW2EDZ5UIPi5cTW0PA"
@@ -25,3 +26,32 @@
   },
   "pdfs_path": "documentos/pdfs"
 }
+=======
+{
+  "gemini": {
+    "api_key": "AIzaSyAGxfC7TQ-jPxnsBhW2EDZ5UIPi5cTW0PA"
+  },
+  "mongo": {
+    "connectionUri": "mongodb+srv://ehavn:1951@cluster-chatbot.npckgpy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster-chatbot",
+    "db_name": "messages",
+    "collection_sanitize": "sanitize",
+    "collection_raw": "raw"
+  },
+  "whatsapp": {
+    "token": "EAA8c9oS34F4BPG66Uj1wTXP2aq8wojlkk3HmaF3CZCw9hjYtmKSRp6G6ZCLFv2ZCoLPns5v8XAIBiFeZAzMljKY5xFI1LhH4s3GsYB0oDsr6jtXVSDhYofoYoBvBVDwLBdZBZBFDkXAIfry9b7e0yei71nDoGwshPi4VQKRnjTtK14PRomYZA45bjBoZCxrI0uZBlW7WCodvfhy6FO7bhOiBA8dKpovNxU7lDaOohUovpZCPyiJcsZD",
+    "phone_number_id": "744187182111085",
+    "to_phone_number": "5551993623547"
+  },
+  "rabbitmq": {
+    "host": "localhost",
+    "user": "admin",
+    "password": "admin",
+    "queue": "incoming_messages"
+  },
+  "flask": {
+    "port": 5000,
+    "debug": true
+  },
+  "pdfs_path": "documentos/pdfs"
+}
+>>>>>>> cccf66339631c294e783b616174331c055f49216
