@@ -1,184 +1,97 @@
-<<<<<<< HEAD
-# Pipeline de Sanitização e Transferência de Mensagens
-Este serviço implementa um pipeline de processamento de dados que opera em duas fases principais: sanitização e transferência. Ele foi projetado para ler mensagens de uma coleção no MongoDB, mascarar dados sensíveis como CPFs, e-mails e telefones, e, em seguida, mover os dados limpos para uma coleção separada, pronta para consumo seguro.
+# Microsserviço Preparador de Mensagens
+
+Este serviço atua como o primeiro estágio em um pipeline de processamento de mensagens. Sua principal responsabilidade é consumir mensagens de uma fila, enriquecê-las e prepará-las para o próximo estágio do processo, que envolve a interação com uma Inteligência Artificial.
 
 ## 📜 Descrição
-O projeto funciona como um processo ETL (Extração, Transformação, Carga) em lote. Ele é composto por dois "workers" que executam em sequência:
 
-Worker de Sanitização (WorkerSanitize): Busca por mensagens com status "pending" na coleção de dados brutos (raw). Para cada mensagem, ele aplica uma série de regras de sanitização para mascarar informações pessoais identificáveis (PII). Após o processo, o status da mensagem é atualizado para "sanitized".
+O projeto opera em um fluxo contínuo e orientado a eventos:
 
-Worker de Transferência (WorkerTransfer): Busca por mensagens que já foram sanitizadas (status "sanitized"). Ele copia essas mensagens para uma nova coleção (sanitize) e, por fim, atualiza o status da mensagem original para "transferred", completando o ciclo.
+1.  **Consumo:** O serviço escuta uma fila no RabbitMQ (`new_messages`), aguardando a chegada de novas mensagens (enviadas por um webhook, por exemplo).
+2.  **Enriquecimento:** Para cada mensagem recebida, o serviço executa duas tarefas principais:
+    * **Sanitização:** Mascara dados sensíveis no conteúdo da mensagem, como e-mails e CPFs, para proteger a privacidade.
+    * **Busca de Histórico:** Consulta um banco de dados MongoDB para recuperar o histórico de conversas anteriores do mesmo remetente.
+3.  **Publicação:** Por fim, ele empacota a *mensagem atual sanitizada* junto com o *histórico* e publica este pacote completo em uma segunda fila do RabbitMQ (`ia_messages`), de onde será consumido pela próxima aplicação do pipeline.
 
-Este processo garante que os dados sensíveis sejam protegidos antes de serem expostos a outros sistemas ou processos, como bots de atendimento ou plataformas de análise.
+Este design desacopla a recepção da mensagem do seu processamento final, garantindo um sistema mais resiliente, escalável e de fácil manutenção.
 
 ## ✨ Funcionalidades
-Processamento em Lote: Projetado para processar múltiplas mensagens em cada execução.
 
-Mascaramento de Dados: Identifica e mascara automaticamente CPFs, e-mails e números de telefone no conteúdo das mensagens.
-
-Pipeline de Múltiplos Estágios: Separa as responsabilidades de sanitização e transferência em workers distintos.
-
-Controle de Estado: Utiliza um campo status ("pending", "sanitized", "transferred") para controlar o progresso de cada mensagem no pipeline.
-
-Acesso a Dados Organizado: Utiliza uma classe DAO (MessageDAO) para abstrair e centralizar todas as operações com o MongoDB.
-
-
-Pronto para Contêineres: Inclui um Dockerfile para fácil empacotamento e execução em ambientes containerizados. 
+* **Processamento em Tempo Real:** Opera como um serviço de longa duração que processa mensagens assim que elas chegam.
+* **Arquitetura Orientada a Eventos:** Utiliza RabbitMQ para comunicação assíncrona entre os componentes do sistema.
+* **Mascaramento de Dados:** Protege informações pessoais identificáveis (PII) antes de enviá-las para os próximos estágios.
+* **Enriquecimento de Dados:** Agrega contexto histórico às novas mensagens, fornecendo mais informações para a IA.
+* **Persistência de Histórico:** Utiliza o MongoDB para armazenar um log completo e imutável de todas as mensagens recebidas.
+* [cite_start]**Pronto para Contêineres:** Inclui um `Dockerfile` para fácil empacotamento e execução em ambientes containerizados. [cite: 2, 3]
 
 ## 🛠️ Tecnologias Utilizadas
-Python 3.11
 
-
-PyMongo: Biblioteca para comunicação com o MongoDB. 
-
-Docker: Para containerização da aplicação.
+* **Python 3.11**
+* **Pika:** Biblioteca para comunicação com o RabbitMQ.
+* [cite_start]**PyMongo:** Biblioteca para comunicação com o MongoDB. [cite: 1]
+* **RabbitMQ:** Broker de mensagens para o fluxo de eventos.
+* **MongoDB:** Banco de dados para armazenamento do histórico.
+* [cite_start]**Docker:** Para containerização da aplicação. [cite: 2, 3]
 
 ## ⚙️ Configuração
-Antes de executar, é necessário configurar a conexão com o MongoDB.
 
-Crie uma pasta chamada config.
+Antes de executar, é necessário configurar as conexões com o MongoDB e o RabbitMQ.
 
-Dentro de config/, crie o arquivo config.json com a estrutura abaixo, substituindo connectionUri pela sua string de conexão do MongoDB Atlas.
+1.  Crie uma pasta chamada `config`.
+2.  Dentro de `config/`, crie o arquivo `config.json` com a estrutura abaixo, substituindo os valores pelos da sua infraestrutura.
 
-JSON
-
+```json
 {
   "mongodb": {
     "connectionUri": "sua_connection_string_do_mongodb",
     "db_name": "messages",
-    "collection_raw": "raw",
-    "collection_sanitize": "sanitize"
+    "collection_raw": "raw"
+  },
+  "rabbitmq": {
+    "host": "localhost",
+    "queue_new_messages": "new_messages",
+    "queue_ia_messages": "ia_messages"
   }
 }
-## 🚀 Como Executar
+🚀 Como Executar
 Você pode executar o projeto localmente com Python ou utilizando Docker.
 
-Pré-requisitos
+Pré-requisitos:
+
 Python 3.11 ou superior
 
-Docker (para a opção com contêiner)
+Docker e Docker Compose (recomendado para rodar o RabbitMQ)
 
-Acesso a um cluster MongoDB com as coleções e dados necessários.
+Acesso a um cluster MongoDB.
 
-### 1. Execução Local
+1. Execução Local
 Bash
 
-- 1. Clone o repositório
+# 1. Clone o repositório
 git clone <url-do-seu-repositorio>
 cd <nome-do-repositorio>
 
-- 2. Crie e ative um ambiente virtual (recomendado)
+# 2. Crie e ative um ambiente virtual
 python -m venv venv
 source venv/bin/activate  # No Windows: venv\Scripts\activate
 
-- 3. Instale as dependências
+# 3. Instale as dependências
 pip install -r requirements.txt
 
-- 4. Execute o pipeline
-python main.py
-### 2. Execução com Docker
+# 4. Inicie um servidor RabbitMQ (exemplo com Docker)
+docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management
+
+# 5. Execute a aplicação
+python app.py
+2. Execução com Docker
 Bash
 
-- 1. Clone o repositório
+# 1. Clone o repositório
 git clone <url-do-seu-repositorio>
 cd <nome-do-repositorio>
 
-- 2. Construa a imagem Docker
-docker build -t worker-pipeline .
+# 2. Construa a imagem Docker
+docker build -t preparador-mensagens .
 
-- 3. Execute o contêiner
-docker run --name meu-worker -d worker-pipeline
-
-=======
-# Pipeline de Sanitização e Transferência de Mensagens
-Este serviço implementa um pipeline de processamento de dados que opera em duas fases principais: sanitização e transferência. Ele foi projetado para ler mensagens de uma coleção no MongoDB, mascarar dados sensíveis como CPFs, e-mails e telefones, e, em seguida, mover os dados limpos para uma coleção separada, pronta para consumo seguro.
-
-## 📜 Descrição
-O projeto funciona como um processo ETL (Extração, Transformação, Carga) em lote. Ele é composto por dois "workers" que executam em sequência:
-
-Worker de Sanitização (WorkerSanitize): Busca por mensagens com status "pending" na coleção de dados brutos (raw). Para cada mensagem, ele aplica uma série de regras de sanitização para mascarar informações pessoais identificáveis (PII). Após o processo, o status da mensagem é atualizado para "sanitized".
-
-Worker de Transferência (WorkerTransfer): Busca por mensagens que já foram sanitizadas (status "sanitized"). Ele copia essas mensagens para uma nova coleção (sanitize) e, por fim, atualiza o status da mensagem original para "transferred", completando o ciclo.
-
-Este processo garante que os dados sensíveis sejam protegidos antes de serem expostos a outros sistemas ou processos, como bots de atendimento ou plataformas de análise.
-
-## ✨ Funcionalidades
-Processamento em Lote: Projetado para processar múltiplas mensagens em cada execução.
-
-Mascaramento de Dados: Identifica e mascara automaticamente CPFs, e-mails e números de telefone no conteúdo das mensagens.
-
-Pipeline de Múltiplos Estágios: Separa as responsabilidades de sanitização e transferência em workers distintos.
-
-Controle de Estado: Utiliza um campo status ("pending", "sanitized", "transferred") para controlar o progresso de cada mensagem no pipeline.
-
-Acesso a Dados Organizado: Utiliza uma classe DAO (MessageDAO) para abstrair e centralizar todas as operações com o MongoDB.
-
-
-Pronto para Contêineres: Inclui um Dockerfile para fácil empacotamento e execução em ambientes containerizados. 
-
-## 🛠️ Tecnologias Utilizadas
-Python 3.11
-
-
-PyMongo: Biblioteca para comunicação com o MongoDB. 
-
-Docker: Para containerização da aplicação.
-
-## ⚙️ Configuração
-Antes de executar, é necessário configurar a conexão com o MongoDB.
-
-Crie uma pasta chamada config.
-
-Dentro de config/, crie o arquivo config.json com a estrutura abaixo, substituindo connectionUri pela sua string de conexão do MongoDB Atlas.
-
-JSON
-
-{
-  "mongodb": {
-    "connectionUri": "sua_connection_string_do_mongodb",
-    "db_name": "messages",
-    "collection_raw": "raw",
-    "collection_sanitize": "sanitize"
-  }
-}
-## 🚀 Como Executar
-Você pode executar o projeto localmente com Python ou utilizando Docker.
-
-Pré-requisitos
-Python 3.11 ou superior
-
-Docker (para a opção com contêiner)
-
-Acesso a um cluster MongoDB com as coleções e dados necessários.
-
-### 1. Execução Local
-Bash
-
-- 1. Clone o repositório
-git clone <url-do-seu-repositorio>
-cd <nome-do-repositorio>
-
-- 2. Crie e ative um ambiente virtual (recomendado)
-python -m venv venv
-source venv/bin/activate  # No Windows: venv\Scripts\activate
-
-- 3. Instale as dependências
-pip install -r requirements.txt
-
-- 4. Execute o pipeline
-python main.py
-### 2. Execução com Docker
-Bash
-
-- 1. Clone o repositório
-git clone <url-do-seu-repositorio>
-cd <nome-do-repositorio>
-
-- 2. Construa a imagem Docker
-docker build -t worker-pipeline .
-
-- 3. Execute o contêiner
-docker run --name meu-worker -d worker-pipeline
-
->>>>>>> cccf66339631c294e783b616174331c055f49216
-Ao ser executado, o main.py irá instanciar e rodar o worker de sanitização e, logo em seguida, o worker de transferência, processando todas as mensagens pendentes.
+# 3. Execute o contêiner
+# (Certifique-se de que o RabbitMQ e o MongoDB estejam acessíveis pela rede)
+docker run --name meu-preparador --network host -d preparador-mensagens
