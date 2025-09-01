@@ -10,6 +10,6 @@ def get_mongo_client():
     connection_uri = config.get("connectionUri")
     if not connection_uri:
         raise ValueError("connectionUri não encontrado no config.json")
-    # tlsAllowInvalidCertificates=True ignora erro de SSL temporariamente
+
     client = MongoClient(connection_uri)
     return client, config
