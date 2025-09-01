@@ -1,0 +1,4 @@
+pymongo[srv]
+google.generativeai[srv]
+psycopg2[srv]
+requests[srv]
