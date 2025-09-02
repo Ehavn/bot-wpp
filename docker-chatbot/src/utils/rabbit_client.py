@@ -9,6 +9,8 @@ def load_config():
     caminho a partir da localização deste script.
     """
     try:
+        # 1. Caminho robusto para o arquivo de configuração
+        # (Sobe dois níveis a partir de 'src/utils/')
         config_path = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'config.json')
         
         with open(config_path, "r", encoding="utf-8") as f:

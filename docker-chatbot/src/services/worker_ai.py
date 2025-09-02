@@ -18,27 +18,37 @@ class WorkerAI:
         # Configura a conexão com RabbitMQ
         self.rabbit_connection, self.rabbit_config = get_rabbit_connection()
         self.channel = self.rabbit_connection.channel()
-        setup_queues(self.channel, self.rabbit_config)
+        # setup_queues(self.channel, self.rabbit_config) # Removido para evitar re-declaração desnecessária
 
     def _callback(self, ch, method, properties, body):
         try:
             package = json.loads(body)
             current_message = package.get("current_message", {})
-            history = package.get("history", [])
+            # A variável history não é usada nesta lógica, mas pode ser no futuro
+            # history = package.get("history", [])
             
-            phone_number = current_message.get("phone_number")
-            content = current_message.get("content")
+            # --- MUDANÇA 1: Lendo as chaves corretas do JSON ---
+            phone_number = current_message.get("from")
+            text_object = current_message.get("text", {})
+            content = text_object.get("body") if isinstance(text_object, dict) else text_object
             
             if not all([phone_number, content]):
-                self.logger.warning("Mensagem recebida sem phone_number ou content. Descartando.")
+                self.logger.warning(f"Mensagem recebida sem 'from' ou 'text.body'. Descartando: {current_message}")
                 ch.basic_ack(delivery_tag=method.delivery_tag)
                 return
 
-            self.logger.info(f"Processando pacote para {phone_number}")
+            self.logger.info(f"Processando pacote para {phone_number} com a mensagem: '{content}'")
 
-            # 1. Pega contexto de um PDF (exemplo: 'documento_geral.pdf')
-            # Você pode criar uma lógica para escolher o PDF certo aqui
-            contexto_pdf = self.pdf_manager.get_resumo("documento_geral.pdf")
+            # --- MUDANÇA 2: Usando o contexto dos PDFs de forma dinâmica ---
+            contexto_pdf = ""
+            # Verifica se algum documento PDF foi carregado pelo PDFManager
+            if self.pdf_manager.documents:
+                # Pega o nome do primeiro PDF encontrado para usar como contexto
+                primeiro_pdf = list(self.pdf_manager.documents.keys())[0]
+                contexto_pdf = self.pdf_manager.get_resumo(primeiro_pdf)
+                self.logger.info(f"Usando contexto do PDF: '{primeiro_pdf}'")
+            else:
+                self.logger.warning("Nenhum PDF carregado. A IA responderá sem contexto adicional.")
 
             # 2. Envia para o Gemini com o contexto do PDF
             bot_resposta = self.gemini.enviar_mensagem(content, contexto=contexto_pdf)
@@ -52,14 +62,15 @@ class WorkerAI:
 
         except Exception as e:
             self.logger.error(f"Erro ao processar pacote da fila: {e}")
+            # Rejeita a mensagem e não a coloca de volta na fila
             ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
     def run(self):
         """Inicia o consumo da fila de mensagens prontas para a IA."""
-        self.channel.basic_qos(prefetch_count=1)
+        self.channel.basic_qos(prefetch_count=1) # Processa uma mensagem por vez
         self.channel.basic_consume(
-            queue=self.rabbit_config["queue_ia_messages"],
+            queue=self.rabbit_config["queue"], # Usa a fila definida no config
             on_message_callback=self._callback
         )
-        self.logger.info("Worker da IA iniciado. Aguardando mensagens na fila...")
+        self.logger.info(f"Worker da IA iniciado. Aguardando mensagens na fila '{self.rabbit_config['queue']}'...")
         self.channel.start_consuming()

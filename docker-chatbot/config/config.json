@@ -13,5 +13,5 @@
     "password": "admin",
     "queue": "ia_messages"
   },
-  "pdfs_path": "documentos/pdfs"
+  "pdfs_path": "documents/pdfs"
 }
