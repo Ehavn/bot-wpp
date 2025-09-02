@@ -1,3 +1,5 @@
+# Arquivo: src/services/pdfManager.py
+
 import os
 import pdfplumber
 
@@ -5,6 +7,8 @@ class PDFManager:
     def __init__(self, pasta_pdfs: str):
         self.documentos = {}  # {nome_arquivo: texto}
         self.carregar_pasta(pasta_pdfs)
+        # --- LINHA DE DEBUG ADICIONADA ---
+        print("DEBUG: PDFManager inicializado com sucesso.")
 
     def carregar_pasta(self, pasta: str):
         """Carrega todos os PDFs da pasta."""
