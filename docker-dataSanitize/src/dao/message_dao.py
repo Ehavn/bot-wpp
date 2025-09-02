@@ -1,4 +1,5 @@
-# src/dao/message_dao.py
+# Arquivo: src/dao/message_dao.py
+
 from bson import ObjectId
 
 class MessageDAO:
@@ -7,23 +8,40 @@ class MessageDAO:
         self.collection_raw = self.db[config["collection_raw"]]
 
     def save_raw_message(self, message_data: dict) -> ObjectId:
-        """
-        Salva a mensagem original e retorna o ID do MongoDB.
-        """
+        """Salva a mensagem original com status inicial 'pending'."""
+        message_data['status'] = 'pending'
         result = self.collection_raw.insert_one(message_data)
         return result.inserted_id
 
+    def find_and_update_one_pending_message(self):
+        """Encontra uma mensagem com status 'pending' e a atualiza para 'processing'."""
+        return self.collection_raw.find_one_and_update(
+            {'status': 'pending'},
+            {'$set': {'status': 'processing'}}
+        )
+
+    def mark_message_as_processed(self, message_id: ObjectId):
+        """Atualiza o status de uma mensagem para 'processed'."""
+        self.collection_raw.update_one(
+            {'_id': message_id},
+            {'$set': {'status': 'processed'}}
+        )
+    
+    def mark_message_as_failed(self, message_id: ObjectId):
+        """Atualiza o status de uma mensagem para 'failed'."""
+        self.collection_raw.update_one(
+            {'_id': message_id},
+            {'$set': {'status': 'failed'}}
+        )
+
     def get_message_history_by_phone(self, phone_number: str, limit: int = 10) -> list:
         """
-        Busca as últimas 'limit' mensagens de um número de telefone,
-        excluindo a mais recente (que é a mensagem atual).
+        Busca as últimas 'limit' mensagens de um número de telefone.
         """
-        # Ordena por timestamp descendente para pegar as mais recentes
         cursor = self.collection_raw.find(
-            {"phone_number": phone_number}
+            {"from": phone_number, "status": "processed"} 
         ).sort("timestamp", -1).limit(limit)
         
-        # Converte o cursor para lista e remove o ObjectId para serialização
         history = []
         for doc in cursor:
             doc["_id"] = str(doc["_id"])

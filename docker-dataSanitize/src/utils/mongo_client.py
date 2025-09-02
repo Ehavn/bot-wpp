@@ -1,41 +1,40 @@
-<<<<<<< HEAD
+# Arquivo: src/utils/mongo_client.py
+
 import json
+import os
 from pymongo import MongoClient
+from pymongo.errors import ConnectionFailure
 
 def load_config():
-    with open("config/config.json", "r") as f:
-        return json.load(f)
+    """
+    Carrega o arquivo de configuração de forma segura.
+    """
+    try:
+        # Calcula o caminho para o config.json na raiz do projeto
+        config_path = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'config.json')
+        with open(config_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        raise FileNotFoundError("ERRO: O arquivo 'config/config.json' não foi encontrado na raiz do projeto.")
 
 def get_mongo_client():
+    """
+    Cria e retorna um cliente do MongoDB e a sua configuração específica.
+    """
     config = load_config()
-    mongo_config = config.get("mongodb")
+    mongo_config = config.get("mongo")
     if not mongo_config:
-        raise ValueError("Chave 'mongodb' não encontrada no config")
+        raise ValueError("Chave 'mongo' não encontrada no config.json")
     
     connection_uri = mongo_config.get("connectionUri")
     if not connection_uri:
-        raise ValueError("connectionUri não encontrado no config['mongodb']")
+        raise ValueError("Chave 'connectionUri' não encontrada na seção 'mongo' do config")
     
-    client = MongoClient(connection_uri)
-    return client, mongo_config
-=======
-import json
-from pymongo import MongoClient
-
-def load_config():
-    with open("config/config.json", "r") as f:
-        return json.load(f)
-
-def get_mongo_client():
-    config = load_config()
-    mongo_config = config.get("mongodb")
-    if not mongo_config:
-        raise ValueError("Chave 'mongodb' não encontrada no config")
-    
-    connection_uri = mongo_config.get("connectionUri")
-    if not connection_uri:
-        raise ValueError("connectionUri não encontrado no config['mongodb']")
-    
-    client = MongoClient(connection_uri)
-    return client, mongo_config
->>>>>>> cccf66339631c294e783b616174331c055f49216
+    try:
+        client = MongoClient(connection_uri)
+        # Testa a conexão para garantir que está funcionando
+        client.admin.command('ping')
+        return client, mongo_config
+    except ConnectionFailure as e:
+        print(f"Falha ao conectar ao MongoDB: {e}")
+        raise

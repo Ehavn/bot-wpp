@@ -12,7 +12,7 @@ class WorkerAI:
 
     def _callback(self, ch, method, properties, body):
         package = json.loads(body)
-        phone_number = package.get("current_message", {}).get("phone_number")
+        phone_number = package.get("current_message", {}).get("from")
         self.logger.info(f"Recebido pacote para IA do número {phone_number}")
 
         #

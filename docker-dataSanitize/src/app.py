@@ -1,28 +1,14 @@
-# app.py
-from src.services.worker_preparer import WorkerPreparer
-import threading
+# Arquivo: src/app.py
 
-def run_worker(worker):
-    """Função para ser executada em uma thread."""
-    worker_name = worker.__class__.__name__
-    print(f"Iniciando {worker_name}...")
-    try:
-        worker.run()
-    except KeyboardInterrupt:
-        print(f"{worker_name} interrompido.")
+from src.services.worker_preparer import WorkerPreparer
+# O 'threading' não é mais necessário para um único worker
 
 def main():
-    # Inicializa apenas o worker de preparação
+    """Função principal que inicia o worker."""
+    # Inicializa o worker de preparação
     preparer_worker = WorkerPreparer()
-
-    # Cria a thread para o worker
-    preparer_thread = threading.Thread(target=run_worker, args=(preparer_worker,))
-
-    # Inicia a thread
-    preparer_thread.start()
-    print("Aplicação 1 (Preparador) em execução. Pressione CTRL+C para sair.")
-    
-    preparer_thread.join()
+    # Chama o método run() diretamente
+    preparer_worker.run()
 
 if __name__ == "__main__":
     main()

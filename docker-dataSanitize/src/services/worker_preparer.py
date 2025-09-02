@@ -1,65 +1,115 @@
-# src/services/worker_preparer.py
+# Arquivo: src/services/worker_preparer.py
+
 import json
 import pika
-from src.services.sanitizer import Sanitizer
-from src.utils.rabbit_client import get_rabbit_connection, setup_queues
-from src.utils.mongo_client import get_mongo_client
-from src.dao.message_dao import MessageDAO
-from src.utils.logger import get_logger
+import time
+import signal
+from ..utils.rabbit_client import get_rabbit_connection, setup_queues
+from ..utils.mongo_client import get_mongo_client
+from ..dao.message_dao import MessageDAO
+from ..services.sanitizer import Sanitizer
 
 class WorkerPreparer:
+    # O método __init__ e shutdown_handler continuam os mesmos
     def __init__(self):
-        # Conexão com RabbitMQ
+        self.shutdown_flag = False
+        signal.signal(signal.SIGINT, self.shutdown_handler)
+        signal.signal(signal.SIGTERM, self.shutdown_handler)
         self.rabbit_connection, self.rabbit_config = get_rabbit_connection()
         self.channel = self.rabbit_connection.channel()
         setup_queues(self.channel, self.rabbit_config)
-        
-        # Conexão com MongoDB
-        mongo_client, mongo_cfg = get_mongo_client()
-        self.dao = MessageDAO(mongo_client, mongo_cfg)
-        
+        self.mongo_client, self.mongo_config = get_mongo_client()
+        self.message_dao = MessageDAO(self.mongo_client, self.mongo_config)
         self.sanitizer = Sanitizer()
-        self.logger = get_logger("WorkerPreparer")
+        print("Iniciando WorkerPreparer...")
 
-    def _callback(self, ch, method, properties, body):
+    def shutdown_handler(self, signum, frame):
+        print("\nSinal de desligamento recebido! Finalizando o trabalho atual e encerrando...")
+        self.shutdown_flag = True
+
+    def process_pending_messages(self):
+        """Busca e processa uma única mensagem pendente do MongoDB."""
+        if self.shutdown_flag:
+            return False
+
+        pending_message = self.message_dao.find_and_update_one_pending_message()
+        if not pending_message:
+            return False
+
+        print(f"Mensagem encontrada para processar. ID: [{pending_message['_id']}]")
+        
         try:
-            current_message = json.loads(body)
-            phone_number = current_message.get("phone_number")
-            self.logger.info(f"Preparando mensagem de {phone_number}")
+            phone_number = pending_message.get("from")
+            if phone_number:
+                history = self.message_dao.get_message_history_by_phone(phone_number)
+                print(f"Histórico de {len(history)} mensagens encontrado para {phone_number}.")
 
-            # 1. Sanitiza a mensagem atual
-            sanitized_content = self.sanitizer.sanitize(current_message.get("content", ""))
-            current_message["content"] = sanitized_content
+                # --- MUDANÇA PRINCIPAL AQUI ---
+                # Lógica robusta para sanitizar o texto
+                if "text" in pending_message and pending_message["text"]:
+                    text_field = pending_message["text"]
+                    
+                    # Caso 1: O campo 'text' é um dicionário (comum em webhooks)
+                    if isinstance(text_field, dict) and "body" in text_field:
+                        original_text = text_field["body"]
+                        sanitized_text = self.sanitizer.sanitize(original_text)
+                        # Atualiza apenas o corpo do texto dentro do dicionário
+                        pending_message["text"]["body"] = sanitized_text
+                        print("Corpo do texto (body) sanitizado.")
+                    
+                    # Caso 2: O campo 'text' é uma string
+                    elif isinstance(text_field, str):
+                        sanitized_text = self.sanitizer.sanitize(text_field)
+                        pending_message["text"] = sanitized_text
+                        print("Texto da mensagem atual sanitizado.")
+                    
+                    # Caso 3: É outro tipo de dado, não faz nada
+                    else:
+                        print(f"AVISO: Campo 'text' tem um tipo inesperado ({type(text_field)}) e não foi sanitizado.")
+                
+                package_for_ai = {
+                    "current_message": pending_message,
+                    "history": history
+                }
 
-            # 2. Busca o histórico de mensagens
-            history = self.dao.get_message_history_by_phone(phone_number)
-            self.logger.info(f"Encontradas {len(history)} mensagens no histórico.")
+                ia_queue = self.rabbit_config.get("queue_ia_messages")
+                self.channel.basic_publish(
+                    exchange='',
+                    routing_key=ia_queue,
+                    body=json.dumps(package_for_ai, default=str),
+                    properties=pika.BasicProperties(delivery_mode=2)
+                )
+                print(f"Pacote de dados para {phone_number} encaminhado para a fila: [{ia_queue}]")
 
-            # 3. Monta o pacote final para a IA
-            package_for_ia = {
-                "current_message": current_message,
-                "history": history
-            }
+                self.message_dao.mark_message_as_processed(pending_message['_id'])
+                print(f"Mensagem ID [{pending_message['_id']}] marcada como 'processed'.")
 
-            # 4. Publica o pacote na próxima fila
-            self.channel.basic_publish(
-                exchange='',
-                routing_key=self.rabbit_config["queue_ia_messages"],
-                body=json.dumps(package_for_ia),
-                properties=pika.BasicProperties(delivery_mode=2)
-            )
-            self.logger.info(f"Pacote para {phone_number} enviado para a fila da IA.")
-            
-            ch.basic_ack(delivery_tag=method.delivery_tag)
+            else:
+                self.message_dao.mark_message_as_failed(pending_message['_id'])
+                print(f"AVISO: Mensagem ID [{pending_message['_id']}] sem a chave 'from'. Marcando como falha.")
+
         except Exception as e:
-            self.logger.error(f"Falha ao preparar mensagem: {e}")
-            ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+            print(f"Erro ao processar mensagem ID [{pending_message['_id']}]: {e}")
+            self.message_dao.mark_message_as_failed(pending_message['_id'])
+        
+        return True
 
+    # O método run() continua o mesmo
     def run(self):
-        self.channel.basic_qos(prefetch_count=1)
-        self.channel.basic_consume(
-            queue=self.rabbit_config["queue_new_messages"],
-            on_message_callback=self._callback
-        )
-        self.logger.info("Aguardando novas mensagens para preparar...")
-        self.channel.start_consuming()
+        print("Aplicação (Sanitizador) em execução. Buscando mensagens no MongoDB... Pressione CTRL+C para sair.")
+        while not self.shutdown_flag:
+            try:
+                was_message_processed = self.process_pending_messages()
+                if not was_message_processed and not self.shutdown_flag:
+                    print("Nenhuma mensagem pendente encontrada. Aguardando 5 segundos...")
+                    time.sleep(5)
+            except Exception as e:
+                print(f"Ocorreu um erro inesperado no loop principal: {e}")
+                time.sleep(10)
+        
+        print("Fechando conexões...")
+        if self.rabbit_connection and self.rabbit_connection.is_open:
+            self.rabbit_connection.close()
+        if self.mongo_client:
+            self.mongo_client.close()
+        print("Aplicação encerrada.")
