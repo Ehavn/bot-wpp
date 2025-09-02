@@ -1,3 +1,5 @@
+# Arquivo: src/consumer/rabbitmq_consumer.py
+
 import pika
 import json
 import time
@@ -7,12 +9,17 @@ from ..utils.logger import get_logger
 
 logger = get_logger("consumer")
 
+# A função agora aceita 'rabbit_config' como um argumento
 def start_consumer(rabbit_config):
+    """
+    Inicia o consumidor usando a configuração recebida,
+    processa mensagens da fila do RabbitMQ e as insere no MongoDB.
+    """
     RABBIT_HOST = rabbit_config["host"]
     RABBIT_USER = rabbit_config["user"]
     RABBIT_PASS = rabbit_config["password"]
     QUEUE_NAME = rabbit_config["queue"]
-    QUEUE_ERROR = rabbit_config.get("queue_error", "failed_messages")  # fila de erro
+    QUEUE_ERROR = rabbit_config.get("queue_error", "failed_messages")
 
     # Conexão com MongoDB
     mongo_client, mongo_config = get_mongo_client()
@@ -22,7 +29,7 @@ def start_consumer(rabbit_config):
 
     # Conexão com RabbitMQ
     credentials = pika.PlainCredentials(RABBIT_USER, RABBIT_PASS)
-    parameters = pika.ConnectionParameters(host=RABBIT_HOST, credentials=credentials)
+    parameters = pika.ConnectionParameters(host=RABBIT_HOST, credentials=credentials, heartbeat=600)
 
     while True:
         try:
@@ -43,7 +50,6 @@ def start_consumer(rabbit_config):
             msg = json.loads(body)
             logger.info(f"Mensagem recebida: {msg}")
 
-            # Adiciona status e timestamp
             msg["status"] = "pending"
             msg["created_at"] = datetime.utcnow()
 
@@ -52,13 +58,12 @@ def start_consumer(rabbit_config):
 
         except Exception as e:
             logger.error(f"Erro ao processar mensagem: {e}")
-            # Reenvia mensagem para a fila de erro
             try:
                 channel.basic_publish(
                     exchange="",
                     routing_key=QUEUE_ERROR,
                     body=body,
-                    properties=pika.BasicProperties(delivery_mode=2)  # persistente
+                    properties=pika.BasicProperties(delivery_mode=2)
                 )
                 logger.warning("Mensagem redirecionada para a fila de erro!")
             except Exception as publish_err:

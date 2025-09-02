@@ -18,16 +18,10 @@ try:
     
 except FileNotFoundError:
     logger.error("ERRO: O arquivo 'config.json' não foi encontrado na raiz do projeto.")
-    # Se o arquivo de configuração não for encontrado, podemos parar a aplicação ou usar padrões.
-    # Por segurança, vamos definir valores que provavelmente falharão para forçar a correção.
     RABBIT_HOST, RABBIT_USER, RABBIT_PASS, QUEUE_NAME = None, None, None, None
 except KeyError:
     logger.error("ERRO: A chave 'rabbitmq' ou uma de suas subchaves não foi encontrada no 'config.json'.")
     RABBIT_HOST, RABBIT_USER, RABBIT_PASS, QUEUE_NAME = None, None, None, None
-
-
-# --- FIM DA MODIFICAÇÃO ---
-
 
 def publish_message(msg: dict):
     """Publica uma mensagem no RabbitMQ"""

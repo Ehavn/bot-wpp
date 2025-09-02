@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 import logging
-from src.rabbitmq import publish_message
+from producer.rabbitmq import publish_message
 
 # Configuração básica de logging
 logging.basicConfig(level=logging.INFO)
