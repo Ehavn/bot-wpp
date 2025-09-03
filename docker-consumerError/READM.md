@@ -1,42 +1,66 @@
-# Aplicação de Gerenciamento de Erros
+## 🚧 Serviço de Captura de Erros (Dead Letter Queue)
+Este serviço implementa um padrão de Dead Letter Queue, atuando como um "coletor" de segurança para mensagens que falharam durante o processamento em outras partes do sistema. Sua única responsabilidade é capturar, registrar e armazenar essas falhas para garantir que nenhum dado seja perdido, permitindo análise e recuperação futura.
 
-Este serviço é responsável por capturar, armazenar e gerenciar mensagens que falharam no processamento do consumidor principal. Ele oferece ferramentas para análise e recuperação de falhas.
+## ✨ Funcionalidades
 
-## Componentes
+Consumidor Dedicado: Roda como um serviço contínuo que escuta ativamente uma fila de erros específica no RabbitMQ (failed_messages).
 
-1.  **Consumidor de Erros (`app_error_handler.py`):**
-    Um serviço que roda em background, escuta a fila de erros do RabbitMQ (`failed_messages`) e salva cada mensagem falha em uma coleção do MongoDB (`dead_letter_messages`) para análise posterior.
 
-2.  **Ferramenta de Gestão (`manage.py`):**
-    Uma interface de linha de comando (CLI) para interagir com as mensagens que falharam.
 
-## Como Usar
 
-### 1. Rodar o Consumidor de Erros
-Este serviço deve ficar rodando continuamente para capturar qualquer erro que aconteça.
+Armazenamento Seguro: Ao receber uma mensagem da fila de erros, ele a persiste em uma coleção dedicada no MongoDB (dead_letter_messages).
 
-```bash
-python app_error_handler.py
-2. Gerenciar Mensagens com Falha (CLI)
-Use este script em outro terminal para executar ações.
 
-Listar todas as mensagens com erro não resolvidas:
+
+Enriquecimento de Dados: Adiciona informações cruciais para auditoria, como a data e hora em que a falha foi registrada (failed_at) e um status inicial de "unresolved".
+
+
+## 📂 Estrutura do Projeto
+.
+├── src/
+│   ├── consumers/
+│   │   └── error_consumer.py     # Lógica do consumidor da fila de erros
+│   ├── logic/
+│   │   ├── db_logic.py           # Funções para interagir com o MongoDB
+│   │   └── retry_logic.py        # Lógica para reenfileirar mensagens
+│   └── utils/
+│       ├── logger.py             # Configuração de logs
+│       ├── mongo_client.py       # Conexão com MongoDB
+│       └── rabbit_client.py      # Conexão com RabbitMQ
+├── app_error_handler.py          # Entrypoint para o consumidor de erros
+├── config.json                   # Arquivo de configuração
+├── requirements.txt
+└── Dockerfile
+## ⚙️ Configuração (config.json)
+O projeto utiliza um arquivo config.json para gerenciar as conexões.
+
+JSON
+
+{
+  "rabbitmq": {
+    "host": "localhost",
+    "user": "admin",
+    "password": "admin",
+    "queue_main": "new_messages",
+    "queue_error": "failed_messages"
+  },
+  "mongo": {
+    "connectionUri": "mongodb+srv://user:pass@cluster.mongodb.net/db_name",
+    "db_name": "messages",
+    "collection_dead_letter": "dead_letter_messages"
+  }
+}
+## 🚀 Como Executar com Docker
+Este serviço foi projetado para rodar continuamente em background.
 
 Bash
 
-python manage.py list
-Ver o detalhe de uma mensagem específica (use o ID da lista anterior):
+- 1. Na raiz do projeto, construa a imagem do serviço
+docker build -t error-handler-service .
 
-Bash
+- 2. Execute o contêiner em modo detached (-d)
+- - Use --network="host" para conectar-se a serviços (RabbitMQ, Mongo) no seu localhost
+docker run -d --name error-handler --network="host" error-handler-service
+Após a execução, o serviço estará escutando a fila 
 
-python manage.py show 63d1a8b1c4e9f7b6d4f9c3e2
-Tentar processar uma mensagem novamente (reenfileirar):
-
-Bash
-
-python manage.py retry 63d1a8b1c4e9f7b6d4f9c3e2
-Descartar uma mensagem que não pode ser processada:
-
-Bash
-
-python manage.py discard 63d1a8b1c4e9f7b6d4f9c3e2
+failed_messages e salvando qualquer mensagem que chegue nela diretamente no MongoDB, na coleção dead_letter_messages.

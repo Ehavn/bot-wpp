@@ -1,227 +1,96 @@
-<<<<<<< HEAD
-# 📲 WhatsApp Chatbot Webhook
-
-Este projeto implementa um **webhook em Flask** que recebe mensagens do WhatsApp e as publica em uma fila **RabbitMQ**, onde outros serviços (como sanitização, IA e armazenamento) podem consumir e processar os dados.
-
----
+## 📲 WhatsApp Chatbot Webhook
+Este projeto implementa um webhook em Flask que recebe mensagens do WhatsApp e as publica em uma fila RabbitMQ, onde outros serviços (como sanitização, IA e armazenamento) podem consumir e processar os dados.
 
 ## 📂 Estrutura do Projeto
-
 DOCKER-WEBHOOK/
 │── config/
-│ └── config.json # Configurações do projeto
+│   └── config.json       # Configurações do projeto
 │── src/
-│ ├── app.py # Flask App (Webhook principal)
-│ ├── rabbitmq.py # Funções de integração com RabbitMQ
-│ └── utils.py # Funções auxiliares (validação, logs)
-│── requirements.txt # Dependências Python
-│── Dockerfile # Build do container
-│── README.md # Este arquivo :)
-
-
----
-
+│   ├── app.py            # Flask App (Webhook principal)
+│   ├── rabbitmq.py       # Funções de integração com RabbitMQ
+│   └── logger.py         # Funções auxiliares (neste caso, `utils.py`)
+│── requirements.txt      # Dependências Python
+│── Dockerfile            # Build do container
+└── README.md             # Este arquivo
 ## 🚀 Como funciona
+O Flask (app.py) expõe um endpoint / que recebe notificações de mensagens do WhatsApp via POST.
 
-1. O **Flask (app.py)** expõe um endpoint `/` que recebe mensagens do WhatsApp.
-2. Cada mensagem recebida é validada e publicada em uma fila no **RabbitMQ**.
-3. O **RabbitMQ** garante persistência e distribuição das mensagens para serviços consumidores (workers).
-4. Futuramente, workers podem:
-   - Armazenar mensagens no **MongoDB** (RAW e sanitizadas).
-   - Salvar relatórios e leads no **Postgres**.
-   - Invocar a **IA (Gemini)** para responder conversas.
+Cada mensagem recebida é extraída e publicada individualmente em uma fila no RabbitMQ.
 
----
+O RabbitMQ atua como um message broker, garantindo a persistência e a distribuição das mensagens para os serviços consumidores (workers).
+
+Futuramente, workers poderão ser implementados para:
+
+Armazenar mensagens no MongoDB (dados brutos e sanitizados).
+
+Salvar relatórios e leads em um banco de dados relacional como o Postgres.
+
+Invocar uma IA (Gemini) para analisar e responder às conversas.
 
 ## ⚙️ Configuração
+Arquivo config/config.json
+O arquivo de configuração define os parâmetros de conexão para o RabbitMQ e as configurações do servidor Flask.
 
-### Arquivo `config/config.json`
+JSON
 
-```json
 {
   "rabbitmq": {
     "host": "localhost",
-    "user": "guest",
-    "password": "guest",
-    "queue": "whatsapp_queue"
+    "user": "admin",
+    "password": "admin",
+    "queue": "new_messages"
   },
   "flask": {
     "port": 5000,
     "debug": true
   }
 }
-🔒 Em produção, recomenda-se usar variáveis de ambiente em vez de config.json.
+🔒 Nota de Segurança: Em um ambiente de produção, é altamente recomendável utilizar variáveis de ambiente para gerenciar credenciais e configurações sensíveis, em vez de um arquivo config.json.
 
-🐳 Rodando com Docker
-Build da imagem
+## 🐳 Rodando com Docker
+- 1. Build da imagem
+Execute o comando a seguir na raiz do projeto para construir a imagem Docker.
+
+Bash
+
 docker build -t whatsapp-webhook .
+- 2. Rodar o container
+Para iniciar o container, use o comando abaixo. Lembre-se de substituir os valores das variáveis de ambiente (RABBIT_HOST, RABBIT_USER, etc.) pelos dados corretos do seu broker RabbitMQ.
 
-Rodar o container
+Bash
+
 docker run -d \
   --name whatsapp-webhook \
   -p 5000:5000 \
   --env RABBIT_HOST=host.docker.internal \
-  --env RABBIT_USER=guest \
-  --env RABBIT_PASS=guest \
-  --env RABBIT_QUEUE=whatsapp_queue \
+  --env RABBIT_USER=admin \
+  --env RABBIT_PASS=admin \
+  --env RABBIT_QUEUE=new_messages \
   whatsapp-webhook
+Nota: O valor host.docker.internal para RABBIT_HOST permite que o container Docker se conecte a um serviço (RabbitMQ) que está rodando na sua máquina host.
 
-📬 Testando o Webhook
+## 📬 Testando o Webhook
+Após iniciar o container, você pode enviar um evento de teste para o endpoint usando curl:
 
-Envie um POST para o endpoint:
+Bash
 
 curl -X POST http://localhost:5000/ \
   -H "Content-Type: application/json" \
   -d '{
     "value": {
       "messages": [
-        {"id": "msg1", "from": "5511999999999", "text": {"body": "Olá"}}
+        {"id": "msg1", "from": "5511999999999", "text": {"body": "Olá, tudo bem?"}},
+        {"id": "msg2", "from": "5521888888888", "text": {"body": "Gostaria de um orçamento."}}
       ]
     }
   }'
-
-
 Resposta esperada:
+O webhook retornará uma confirmação com o número de mensagens publicadas na fila.
+
+JSON
 
 {
   "status": "ok",
-  "count": 1
+  "count": 2
 }
-
-
-E a mensagem aparecerá no RabbitMQ.
-
-🔮 Próximos passos
-
-Implementar worker consumidor que lê mensagens da fila.
-
-Armazenar mensagens RAW e sanitizadas em MongoDB.
-
-Salvar leads e relatórios em Postgres.
-
-Integrar IA (Gemini) para respostas automáticas.
-
-Configurar docker-compose.yml para orquestrar Webhook + RabbitMQ + Workers.
-
-📜 Licença
-
-Projeto interno para estudo e prototipagem.
-
-
----
-
-👉 Quer que eu já adicione ao README um **docker-compose.yml de exemplo** (Webhook + RabbitMQ), assim você consegue subir tudo com um único `docker compose up`?
-=======
-# 📲 WhatsApp Chatbot Webhook
-
-Este projeto implementa um **webhook em Flask** que recebe mensagens do WhatsApp e as publica em uma fila **RabbitMQ**, onde outros serviços (como sanitização, IA e armazenamento) podem consumir e processar os dados.
-
----
-
-## 📂 Estrutura do Projeto
-
-DOCKER-WEBHOOK/
-│── config/
-│ └── config.json # Configurações do projeto
-│── src/
-│ ├── app.py # Flask App (Webhook principal)
-│ ├── rabbitmq.py # Funções de integração com RabbitMQ
-│ └── utils.py # Funções auxiliares (validação, logs)
-│── requirements.txt # Dependências Python
-│── Dockerfile # Build do container
-│── README.md # Este arquivo :)
-
-
----
-
-## 🚀 Como funciona
-
-1. O **Flask (app.py)** expõe um endpoint `/` que recebe mensagens do WhatsApp.
-2. Cada mensagem recebida é validada e publicada em uma fila no **RabbitMQ**.
-3. O **RabbitMQ** garante persistência e distribuição das mensagens para serviços consumidores (workers).
-4. Futuramente, workers podem:
-   - Armazenar mensagens no **MongoDB** (RAW e sanitizadas).
-   - Salvar relatórios e leads no **Postgres**.
-   - Invocar a **IA (Gemini)** para responder conversas.
-
----
-
-## ⚙️ Configuração
-
-### Arquivo `config/config.json`
-
-```json
-{
-  "rabbitmq": {
-    "host": "localhost",
-    "user": "guest",
-    "password": "guest",
-    "queue": "whatsapp_queue"
-  },
-  "flask": {
-    "port": 5000,
-    "debug": true
-  }
-}
-🔒 Em produção, recomenda-se usar variáveis de ambiente em vez de config.json.
-
-🐳 Rodando com Docker
-Build da imagem
-docker build -t whatsapp-webhook .
-
-Rodar o container
-docker run -d \
-  --name whatsapp-webhook \
-  -p 5000:5000 \
-  --env RABBIT_HOST=host.docker.internal \
-  --env RABBIT_USER=guest \
-  --env RABBIT_PASS=guest \
-  --env RABBIT_QUEUE=whatsapp_queue \
-  whatsapp-webhook
-
-📬 Testando o Webhook
-
-Envie um POST para o endpoint:
-
-curl -X POST http://localhost:5000/ \
-  -H "Content-Type: application/json" \
-  -d '{
-    "value": {
-      "messages": [
-        {"id": "msg1", "from": "5511999999999", "text": {"body": "Olá"}}
-      ]
-    }
-  }'
-
-
-Resposta esperada:
-
-{
-  "status": "ok",
-  "count": 1
-}
-
-
-E a mensagem aparecerá no RabbitMQ.
-
-🔮 Próximos passos
-
-Implementar worker consumidor que lê mensagens da fila.
-
-Armazenar mensagens RAW e sanitizadas em MongoDB.
-
-Salvar leads e relatórios em Postgres.
-
-Integrar IA (Gemini) para respostas automáticas.
-
-Configurar docker-compose.yml para orquestrar Webhook + RabbitMQ + Workers.
-
-📜 Licença
-
-Projeto interno para estudo e prototipagem.
-
-
----
-
-👉 Quer que eu já adicione ao README um **docker-compose.yml de exemplo** (Webhook + RabbitMQ), assim você consegue subir tudo com um único `docker compose up`?
->>>>>>> cccf66339631c294e783b616174331c055f49216
+Após o teste, as duas mensagens aparecerão na fila new_messages do seu RabbitMQ.

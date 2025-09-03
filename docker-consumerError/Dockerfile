@@ -1,27 +1,23 @@
 # Usa a imagem base do Python 3.11 slim
 FROM python:3.11-slim
 
-# Define o diretório de trabalho dentro do contêiner
+# Define o diretório de trabalho
 WORKDIR /app
 
-# Instala dependências do sistema que podem ser necessárias para algumas bibliotecas Python
-# É uma boa prática manter, caso futuras dependências precisem compilar código C.
+# Instala dependências do sistema para compilação, se necessário
 RUN apt-get update && apt-get install -y \
     gcc \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# 1. Copia o arquivo de dependências primeiro
+# Copia o arquivo de dependências primeiro para otimizar o cache
 COPY requirements.txt .
 
-# 2. Instala as dependências logo em seguida
-# Esta camada só será reconstruída se o 'requirements.txt' mudar.
+# Instala as dependências Python
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 3. Copia todo o restante do código do projeto
-# Como as dependências já estão instaladas, esta etapa é muito mais rápida.
+# Copia o código-fonte da aplicação
 COPY . .
 
-# 4. Comando que inicia o consumidor de erros
-# Aponta para o 'app_error_handler.py' na raiz do projeto.
+# Comando que inicia o consumidor da fila de erros
 CMD ["python", "app_error_handler.py"]

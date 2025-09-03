@@ -1,4 +1,6 @@
-pika
-google-generativeai
-requests
-pdfplumber
+google-generativeai==0.7.1
+pdfplumber==0.11.1
+pika==1.3.2
+requests==2.32.3
+pymongo==4.6.1
+bson==0.5.10
