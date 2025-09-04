@@ -1,27 +1,17 @@
-# Usa a imagem base do Python 3.11 slim
-FROM python:3.11-slim
+# Dockerfile Definitivo
+FROM python:3.10-slim
 
-# Define o diretório de trabalho
+ENV PYTHONUNBUFFERED True
 WORKDIR /app
 
-# Instala dependências do sistema necessárias (para compilação de pacotes ou SSL)
-RUN apt-get update && apt-get install -y \
-    gcc \
-    libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
+RUN useradd --create-home appuser
+USER appuser
 
-# Copia apenas requirements primeiro (para otimizar cache do Docker)
 COPY requirements.txt .
-
-# Instala dependências Python
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copia os arquivos do projeto
-COPY config/ ./config/
-COPY src/ ./src/
+# Copia toda a pasta src para o diretório de trabalho
+COPY ./src .
 
-# Expõe a porta do Flask
-EXPOSE 5000
-
-# Comando que inicia a aplicação Flask
-CMD ["python", "src/app.py"]
+# Executa a aplicação como um módulo, apontando para src.app
+CMD exec gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 8 --timeout 0 src.app:app

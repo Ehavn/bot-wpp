@@ -1,0 +1,43 @@
+# -------------------------
+# 1. SEGREDOS E CONFIGURAÇÕES LOCAIS
+# -------------------------
+# O arquivo mais importante a ser ignorado. Contém todas as suas senhas e chaves.
+.env
+
+# -------------------------
+# 2. CACHE E ARQUIVOS COMPILADOS DO PYTHON
+# -------------------------
+# Pasta de cache do Python
+__pycache__/
+# Arquivos Python compilados
+*.pyc
+*.pyo
+*.pyd
+
+# -------------------------
+# 3. AMBIENTES VIRTUAIS
+# -------------------------
+# Pastas comuns de ambientes virtuais (venv, env, etc.)
+venv/
+.venv/
+env/
+.env/
+
+# -------------------------
+# 4. ARQUIVOS DE IDE E EDITORES
+# -------------------------
+# Pasta de configuração do Visual Studio Code
+.vscode/
+
+# -------------------------
+# 5. ARQUIVOS GERADOS PELO SISTEMA OPERACIONAL
+# -------------------------
+# Arquivo do macOS
+.DS_Store
+
+# -------------------------
+# 6. ARQUIVOS DE INSTALAÇÃO E BUILD
+# -------------------------
+dist/
+build/
+*.egg-info/
