@@ -1,78 +1,66 @@
-# Arquivo: src/consumer/rabbitmq_consumer.py
+# Arquivo: src/consumer/rabbitmq_consumer.py (exemplo baseado no seu erro)
 
 import pika
 import json
-import time
-from datetime import datetime
-from ..utils.mongo_client import get_mongo_client
-from ..utils.logger import get_logger
+import logging
 
-logger = get_logger("consumer")
+# Supondo que você tenha funções para conectar ao Mongo e processar a mensagem
+# from src.db.mongo_client import get_mongo_connection
+# from src.services.message_processor import process_message
 
-# A função agora aceita 'rabbit_config' como um argumento
-def start_consumer(rabbit_config):
-    """
-    Inicia o consumidor usando a configuração recebida,
-    processa mensagens da fila do RabbitMQ e as insere no MongoDB.
-    """
-    RABBIT_HOST = rabbit_config["host"]
-    RABBIT_USER = rabbit_config["user"]
-    RABBIT_PASS = rabbit_config["password"]
-    QUEUE_NAME = rabbit_config["queue"]
-    QUEUE_ERROR = rabbit_config.get("queue_error", "failed_messages")
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-    # Conexão com MongoDB
-    mongo_client, mongo_config = get_mongo_client()
-    db = mongo_client[mongo_config["db_name"]]
-    collection_raw = db[mongo_config["collection_raw"]]
-    logger.info("Conexão com MongoDB Atlas estabelecida!")
+def callback(ch, method, properties, body):
+    """Função chamada quando uma mensagem é recebida."""
+    logger.info("Mensagem recebida, processando...")
+    try:
+        message_data = json.loads(body)
+        # Aqui você chamaria sua lógica para salvar no MongoDB
+        # Exemplo: process_message(message_data)
+        print(message_data) # Apenas para exemplo
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+        logger.info("Mensagem processada e confirmada (ack).")
+    except Exception as e:
+        logger.error(f"Erro ao processar mensagem: {e}")
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
-    # Conexão com RabbitMQ
-    credentials = pika.PlainCredentials(RABBIT_USER, RABBIT_PASS)
-    parameters = pika.ConnectionParameters(host=RABBIT_HOST, credentials=credentials, heartbeat=600)
+def start_consumer(config):
+    """Inicia o consumidor e trata o desligamento gracioso."""
+    connection = None  # Inicializa a variável de conexão
+    try:
+        # Estabelece a conexão
+        credentials = pika.PlainCredentials(config['user'], config['password'])
+        parameters = pika.ConnectionParameters(host=config['host'], credentials=credentials)
+        connection = pika.BlockingConnection(parameters)
+        channel = connection.channel()
 
-    while True:
-        try:
-            connection = pika.BlockingConnection(parameters)
-            channel = connection.channel()
-            channel.queue_declare(queue=QUEUE_NAME, durable=True)
-            channel.queue_declare(queue=QUEUE_ERROR, durable=True)
-            break
-        except Exception as e:
-            logger.warning(f"Aguardando RabbitMQ... {e}")
-            time.sleep(5)
+        channel.queue_declare(queue=config['queue'], durable=True)
+        channel.basic_qos(prefetch_count=1)
+        channel.basic_consume(queue=config['queue'], on_message_callback=callback)
 
-    logger.info("Conexão com RabbitMQ estabelecida!")
+        logger.info("Consumidor iniciado, aguardando mensagens...")
+        # --- PONTO PRINCIPAL DA MUDANÇA ---
+        # O loop de consumo agora está dentro de um bloco try...except
+        channel.start_consuming()
 
-    # Callback
-    def callback(ch, method, properties, body):
-        try:
-            msg = json.loads(body)
-            logger.info(f"Mensagem recebida: {msg}")
+    except KeyboardInterrupt:
+        logger.info("Interrupção recebida (Ctrl+C). Encerrando o consumidor...")
+        # Para o loop de consumo de forma segura
+        if 'channel' in locals() and channel.is_open:
+            channel.stop_consuming()
 
-            msg["status"] = "pending"
-            msg["created_at"] = datetime.utcnow()
-            msg["role"] = "user"
+    except Exception as e:
+        logger.error(f"Ocorreu um erro inesperado no consumidor: {e}")
 
-            collection_raw.insert_one(msg)
-            logger.info("Mensagem inserida no MongoDB com status 'pending'!")
+    finally:
+        # Garante que a conexão seja fechada, não importa o que aconteça
+        if connection and connection.is_open:
+            connection.close()
+            logger.info("Conexão com o RabbitMQ fechada.")
+        logger.info("Consumidor encerrado.")
 
-        except Exception as e:
-            logger.error(f"Erro ao processar mensagem: {e}")
-            try:
-                channel.basic_publish(
-                    exchange="",
-                    routing_key=QUEUE_ERROR,
-                    body=body,
-                    properties=pika.BasicProperties(delivery_mode=2)
-                )
-                logger.warning("Mensagem redirecionada para a fila de erro!")
-            except Exception as publish_err:
-                logger.critical(f"Falha ao redirecionar para fila de erro: {publish_err}")
-
-        finally:
-            ch.basic_ack(delivery_tag=method.delivery_tag)
-
-    channel.basic_consume(queue=QUEUE_NAME, on_message_callback=callback)
-    logger.info("Consumidor iniciado, aguardando mensagens...")
-    channel.start_consuming()
+# Supondo que seu app.py do consumidor chame esta função
+# if __name__ == '__main__':
+#     # Carrega config do rabbit...
+#     start_consumer(rabbit_config)

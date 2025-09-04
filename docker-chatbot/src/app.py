@@ -5,7 +5,7 @@ from src.services.wpp import WhatsAppChat
 from src.services.worker_ai import WorkerAI
 from src.services.pdfManager import PDFManager
 from src.utils.mongo_client import get_mongo_client # <-- 1. Importações
-from src.services.message_dao import MessageDAO
+from src.dao.message_dao import MessageDAO
 
 if __name__ == "__main__":
     with open("config/config.json", "r") as f:

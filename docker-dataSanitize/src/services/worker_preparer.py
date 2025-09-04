@@ -38,17 +38,17 @@ class WorkerPreparer:
         print(f"Mensagem encontrada para processar. ID: [{pending_message['_id']}]")
         
         try:
-            # Assume que 'conversationId' é o identificador principal.
-            # Se não existir, usa 'from' como fallback.
+            # Pega o ID da mensagem atual para excluí-la do histórico
+            current_id = pending_message.get("_id")
+            # Usa 'conversationId' como primário e 'from' como fallback
             conversation_id = pending_message.get("conversationId") or pending_message.get("from")
             
             if conversation_id:
-                # --- PONTO PRINCIPAL DA ATUALIZAÇÃO ---
-                # Chama o novo método para buscar o histórico completo da conversa
-                history = self.message_dao.get_history_by_conversation_id(conversation_id)
+                # Chama o método do DAO passando o ID da conversa e o ID da mensagem atual
+                history = self.message_dao.get_history(conversation_id, current_id)
                 print(f"Histórico completo de {len(history)} mensagens encontrado para a conversa: {conversation_id}.")
 
-                # Lógica robusta para sanitizar o texto (sem alterações)
+                # Lógica robusta para sanitizar o texto
                 if "text" in pending_message and pending_message["text"]:
                     text_field = pending_message["text"]
                     
@@ -66,7 +66,7 @@ class WorkerPreparer:
                     else:
                         print(f"AVISO: Campo 'text' tem um tipo inesperado ({type(text_field)}) e não foi sanitizado.")
                 
-                # Garante que a mensagem atual tenha o conversationId para consistência
+                # Garante que a mensagem atual tenha o conversationId para consistência futura
                 pending_message["conversationId"] = conversation_id
                 
                 package_for_ai = {
@@ -79,7 +79,7 @@ class WorkerPreparer:
                     exchange='',
                     routing_key=ia_queue,
                     body=json.dumps(package_for_ai, default=str),
-                    properties=pika.BasicProperties(delivery_mode=2)
+                    properties=pika.BasicProperties(delivery_mode=2) # Mensagem persistente
                 )
                 print(f"Pacote de dados para {conversation_id} encaminhado para a fila: [{ia_queue}]")
 
@@ -91,8 +91,9 @@ class WorkerPreparer:
                 print(f"AVISO: Mensagem ID [{pending_message['_id']}] sem 'conversationId' ou 'from'. Marcando como falha.")
 
         except Exception as e:
-            print(f"Erro ao processar mensagem ID [{pending_message['_id']}]: {e}")
-            self.message_dao.mark_message_as_failed(pending_message['_id'])
+            print(f"Erro ao processar mensagem ID [{pending_message.get('_id', 'N/A')}]: {e}")
+            if pending_message:
+                self.message_dao.mark_message_as_failed(pending_message['_id'])
         
         return True
 
@@ -102,7 +103,7 @@ class WorkerPreparer:
             try:
                 was_message_processed = self.process_pending_messages()
                 if not was_message_processed and not self.shutdown_flag:
-                    print("Nenhuma mensagem pendente encontrada. Aguardando 5 segundos...")
+                    # print("Nenhuma mensagem pendente encontrada. Aguardando 5 segundos...")
                     time.sleep(5)
             except Exception as e:
                 print(f"Ocorreu um erro inesperado no loop principal: {e}")
