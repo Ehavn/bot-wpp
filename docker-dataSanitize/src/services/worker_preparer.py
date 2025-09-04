@@ -10,7 +10,6 @@ from ..dao.message_dao import MessageDAO
 from ..services.sanitizer import Sanitizer
 
 class WorkerPreparer:
-    # O método __init__ e shutdown_handler continuam os mesmos
     def __init__(self):
         self.shutdown_flag = False
         signal.signal(signal.SIGINT, self.shutdown_handler)
@@ -39,33 +38,36 @@ class WorkerPreparer:
         print(f"Mensagem encontrada para processar. ID: [{pending_message['_id']}]")
         
         try:
-            phone_number = pending_message.get("from")
-            if phone_number:
-                history = self.message_dao.get_message_history_by_phone(phone_number)
-                print(f"Histórico de {len(history)} mensagens encontrado para {phone_number}.")
+            # Assume que 'conversationId' é o identificador principal.
+            # Se não existir, usa 'from' como fallback.
+            conversation_id = pending_message.get("conversationId") or pending_message.get("from")
+            
+            if conversation_id:
+                # --- PONTO PRINCIPAL DA ATUALIZAÇÃO ---
+                # Chama o novo método para buscar o histórico completo da conversa
+                history = self.message_dao.get_history_by_conversation_id(conversation_id)
+                print(f"Histórico completo de {len(history)} mensagens encontrado para a conversa: {conversation_id}.")
 
-                # --- MUDANÇA PRINCIPAL AQUI ---
-                # Lógica robusta para sanitizar o texto
+                # Lógica robusta para sanitizar o texto (sem alterações)
                 if "text" in pending_message and pending_message["text"]:
                     text_field = pending_message["text"]
                     
-                    # Caso 1: O campo 'text' é um dicionário (comum em webhooks)
                     if isinstance(text_field, dict) and "body" in text_field:
                         original_text = text_field["body"]
                         sanitized_text = self.sanitizer.sanitize(original_text)
-                        # Atualiza apenas o corpo do texto dentro do dicionário
                         pending_message["text"]["body"] = sanitized_text
                         print("Corpo do texto (body) sanitizado.")
                     
-                    # Caso 2: O campo 'text' é uma string
                     elif isinstance(text_field, str):
                         sanitized_text = self.sanitizer.sanitize(text_field)
                         pending_message["text"] = sanitized_text
                         print("Texto da mensagem atual sanitizado.")
                     
-                    # Caso 3: É outro tipo de dado, não faz nada
                     else:
                         print(f"AVISO: Campo 'text' tem um tipo inesperado ({type(text_field)}) e não foi sanitizado.")
+                
+                # Garante que a mensagem atual tenha o conversationId para consistência
+                pending_message["conversationId"] = conversation_id
                 
                 package_for_ai = {
                     "current_message": pending_message,
@@ -79,14 +81,14 @@ class WorkerPreparer:
                     body=json.dumps(package_for_ai, default=str),
                     properties=pika.BasicProperties(delivery_mode=2)
                 )
-                print(f"Pacote de dados para {phone_number} encaminhado para a fila: [{ia_queue}]")
+                print(f"Pacote de dados para {conversation_id} encaminhado para a fila: [{ia_queue}]")
 
                 self.message_dao.mark_message_as_processed(pending_message['_id'])
                 print(f"Mensagem ID [{pending_message['_id']}] marcada como 'processed'.")
 
             else:
                 self.message_dao.mark_message_as_failed(pending_message['_id'])
-                print(f"AVISO: Mensagem ID [{pending_message['_id']}] sem a chave 'from'. Marcando como falha.")
+                print(f"AVISO: Mensagem ID [{pending_message['_id']}] sem 'conversationId' ou 'from'. Marcando como falha.")
 
         except Exception as e:
             print(f"Erro ao processar mensagem ID [{pending_message['_id']}]: {e}")
@@ -94,9 +96,8 @@ class WorkerPreparer:
         
         return True
 
-    # O método run() continua o mesmo
     def run(self):
-        print("Aplicação (Sanitizador) em execução. Buscando mensagens no MongoDB... Pressione CTRL+C para sair.")
+        print("Aplicação (Preparador) em execução. Buscando mensagens no MongoDB... Pressione CTRL+C para sair.")
         while not self.shutdown_flag:
             try:
                 was_message_processed = self.process_pending_messages()

@@ -1,21 +1,30 @@
 from bson import ObjectId
+from datetime import datetime
 
 class MessageDAO:
     def __init__(self, db_client, config: dict):
         self.db = db_client[config["db_name"]]
-        self.collection_sanitize = self.db[config["collection_sanitize"]]
+        # Coleção principal para guardar o histórico da conversa (usuário e IA)
+        self.collection_messages = self.db[config["collection_messages"]]
 
-    def get_sanitized_messages(self):
-        return list(self.collection_sanitize.find({"status": "sanitized"}))
+    def insert_message(self, message_data: dict):
+        """
+        Insere uma nova mensagem (de qualquer autor) na coleção de mensagens.
+        Garante que os campos 'created_at' e 'role' existam.
+        """
+        if "created_at" not in message_data:
+            message_data["created_at"] = datetime.utcnow()
+        if "role" not in message_data:
+            # Define 'user' como padrão se o role não for especificado
+            message_data["role"] = "user"
+            
+        return self.collection_messages.insert_one(message_data)
 
-    def update_message_status(self, message_id, status, new_content=None):
-        update_fields = {"status": status}
-        if new_content is not None:
-            update_fields["content"] = new_content
-        self.collection_sanitize.update_one(
-            {"_id": ObjectId(message_id)},
-            {"$set": update_fields}
-        )
-
-    def insert_sanitized_message(self, data):
-        self.collection_sanitize.insert_one(data)
+    def get_history_by_user(self, user_id: str, limit=10):
+        """
+        Busca o histórico de um usuário, ordenado do mais antigo para o mais novo.
+        (Este método será útil para a próxima fase do seu projeto)
+        """
+        return list(self.collection_messages.find(
+            {"from": user_id}
+        ).sort("created_at", 1).limit(limit))

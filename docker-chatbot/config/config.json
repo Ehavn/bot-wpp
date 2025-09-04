@@ -13,5 +13,10 @@
     "password": "admin",
     "queue": "ia_messages"
   },
-  "pdfs_path": "documents/pdfs"
+  "pdfs_path": "documents/pdfs",
+  "mongo": {
+    "connectionUri": "mongodb+srv://ehavn:1951@cluster-chatbot.npckgpy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster-chatbot",
+    "db_name": "messages",
+    "collection_raw": "raw"
+  }
 }

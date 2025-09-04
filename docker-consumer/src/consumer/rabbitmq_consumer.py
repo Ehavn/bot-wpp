@@ -52,6 +52,7 @@ def start_consumer(rabbit_config):
 
             msg["status"] = "pending"
             msg["created_at"] = datetime.utcnow()
+            msg["role"] = "user"
 
             collection_raw.insert_one(msg)
             logger.info("Mensagem inserida no MongoDB com status 'pending'!")
