@@ -50,6 +50,11 @@ def verify_signature(request):
     
     return hmac.compare_digest(signature_hash, mac.hexdigest())
 
+@app.route("/health", methods=["GET"])
+def health_check():
+    """Endpoint simples para verificação de saúde (health check)."""
+    return jsonify({"status": "healthy"}), 200
+
 @app.route("/", methods=["GET", "POST"])
 def whatsapp_webhook():
     """Rota principal que lida com a verificação do webhook (GET) e o recebimento de notificações (POST)."""
@@ -72,8 +77,17 @@ def whatsapp_webhook():
             logger.error("assinatura invalida", extra={'ip_address': request.remote_addr})
             return "Invalid signature", 403
         
-        # Validação da estrutura do corpo da requisição
-        dados = request.get_json()
+        # Tenta fazer o parse do corpo da requisição para JSON
+        try:
+            dados = request.get_json()
+        except Exception as e:
+            logger.error(
+                "falha ao fazer o parse do json", 
+                extra={'error_message': str(e), 'ip_address': request.remote_addr}
+            )
+            return jsonify({"error": "JSON malformado ou Content-Type inválido."}), 400
+        
+        # Validação da estrutura do payload
         if not validate_whatsapp_payload(dados):
             logger.error(
                 "payload invalido", 
@@ -85,7 +99,7 @@ def whatsapp_webhook():
             return jsonify({"error": "Payload JSON inválido"}), 400
 
         try:
-            # --- LÓGICA DE EXTRAÇÃO AJUSTADA PARA O PAYLOAD REAL ---
+            # Lógica de extração ajustada para o payload real
             messages = dados["value"]["messages"]
             for msg in messages:
                 rabbit_producer.publish(msg)
