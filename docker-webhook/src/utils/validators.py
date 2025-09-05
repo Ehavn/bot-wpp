@@ -4,25 +4,21 @@ logger = logging.getLogger(__name__)
 
 def validate_whatsapp_payload(payload: dict) -> bool:
     """
-    Valida a estrutura real e aninhada de um payload da API do WhatsApp Business.
+    Valida a estrutura de um payload de mensagem do WhatsApp.
+    Esta versão espera uma estrutura mais direta, sem os campos 'entry' e 'changes'.
     """
     try:
-        # Verifica a estrutura aninhada passo a passo para garantir que o caminho existe
+        # Verifica se 'value' é um dicionário e se 'messages' é uma lista não vazia dentro dele
         if (
-            isinstance(payload.get("entry"), list) and
-            payload["entry"] and
-            isinstance(payload["entry"][0].get("changes"), list) and
-            payload["entry"][0]["changes"] and
-            isinstance(payload["entry"][0]["changes"][0].get("value"), dict) and
-            isinstance(payload["entry"][0]["changes"][0]["value"].get("messages"), list) and
-            payload["entry"][0]["changes"][0]["value"]["messages"]
+            isinstance(payload.get("value"), dict) and
+            isinstance(payload["value"].get("messages"), list) and
+            payload["value"]["messages"]
         ):
-            # Se a estrutura principal estiver correta, retorna True
             return True
-    except (KeyError, IndexError, TypeError):
+    except (KeyError, TypeError):
         # Pega qualquer erro que possa ocorrer ao navegar pela estrutura
         logger.warning("Validação falhou devido a uma estrutura de payload inesperada.")
         return False
-    
-    logger.warning("Validação falhou. A estrutura do payload não corresponde ao esperado pela API do WhatsApp.")
+
+    logger.warning("Validação falhou. A estrutura do payload não corresponde ao esperado.")
     return False

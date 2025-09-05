@@ -2,12 +2,12 @@ import pika
 import json
 import os
 import logging
+import time # Importado para usar no sleep
 from dotenv import load_dotenv
 
 # Carrega as variáveis de ambiente do arquivo .env
 load_dotenv()
 
-# Esta linha permanece a mesma. O logger será configurado pelo app.py
 logger = logging.getLogger(__name__)
 
 class RabbitMQProducer:
@@ -25,33 +25,50 @@ class RabbitMQProducer:
         self.connect()
 
     def connect(self):
-        """Estabelece a conexão e o canal com o RabbitMQ."""
-        try:
-            credentials = pika.PlainCredentials(self.user, self.password)
-            parameters = pika.ConnectionParameters(host=self.host, credentials=credentials)
-            self._connection = pika.BlockingConnection(parameters)
-            self._channel = self._connection.channel()
-            self._channel.queue_declare(queue=self.queue_name, durable=True)
-            logger.info(
-                "conexao com rabbitmq estabelecida",
-                extra={'host': self.host, 'queue': self.queue_name}
-            )
-        except Exception as e:
-            logger.error(
-                "falha ao conectar com o rabbitmq", 
-                extra={'error_message': str(e), 'error_type': type(e).__name__}
-            )
-            raise
+        """
+        Estabelece a conexão com o RabbitMQ com uma lógica de retentativa
+        e backoff exponencial.
+        """
+        max_retries = 5
+        retry_delay = 1  # segundos
+
+        for attempt in range(max_retries):
+            try:
+                credentials = pika.PlainCredentials(self.user, self.password)
+                parameters = pika.ConnectionParameters(host=self.host, credentials=credentials)
+                self._connection = pika.BlockingConnection(parameters)
+                self._channel = self._connection.channel()
+                self._channel.queue_declare(queue=self.queue_name, durable=True)
+                logger.info(
+                    "conexao com rabbitmq estabelecida",
+                    extra={'host': self.host, 'queue': self.queue_name}
+                )
+                return # Se a conexão for bem-sucedida, sai da função
+            except pika.exceptions.AMQPConnectionError as e:
+                logger.warning(
+                    "falha ao conectar com o rabbitmq",
+                    extra={
+                        'error_message': str(e),
+                        'attempt': f"{attempt + 1}/{max_retries}",
+                        'next_try_in_seconds': retry_delay
+                    }
+                )
+                if attempt + 1 < max_retries:
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # Dobra o tempo de espera para a próxima tentativa
+                else:
+                    logger.error("nao foi possivel conectar ao rabbitmq apos varias tentativas")
+                    raise # Levanta a exceção se todas as tentativas falharem
 
     def publish(self, msg: dict):
         """Publica uma mensagem com lógica de reconexão e retentativa."""
         try:
             if not self._connection or self._connection.is_closed:
                 logger.warning(
-                    "conexao com rabbitmq perdida ou fechada", 
+                    "conexao com rabbitmq perdida ou fechada, tentando reconectar",
                     extra={'reason': 'reconnecting'}
                 )
-                self.connect()
+                self.connect() # A nova função connect já tem as retentativas
 
             self._channel.basic_publish(
                 exchange='',
@@ -66,7 +83,6 @@ class RabbitMQProducer:
             )
             self.connect()
             logger.info("reconexao bem-sucedida, reenviando mensagem")
-            # Tenta publicar novamente após a reconexão
             self._channel.basic_publish(
                 exchange='',
                 routing_key=self.queue_name,
@@ -84,8 +100,7 @@ class RabbitMQProducer:
         """Fecha a conexão com o RabbitMQ."""
         if self._connection and self._connection.is_open:
             self._connection.close()
-            # --- LOG AJUSTADO ---
             logger.info(
-                "conexao com rabbitmq fechada", 
+                "conexao com rabbitmq fechada",
                 extra={'host': self.host}
             )
