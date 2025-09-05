@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 # Carrega as variáveis de ambiente do arquivo .env
 load_dotenv()
 
+# Esta linha permanece a mesma. O logger será configurado pelo app.py
 logger = logging.getLogger(__name__)
 
 class RabbitMQProducer:
@@ -31,16 +32,28 @@ class RabbitMQProducer:
             self._connection = pika.BlockingConnection(parameters)
             self._channel = self._connection.channel()
             self._channel.queue_declare(queue=self.queue_name, durable=True)
-            logger.info("Conexão com RabbitMQ estabelecida com sucesso.")
+            # --- LOG AJUSTADO ---
+            logger.info(
+                "conexao com rabbitmq estabelecida",
+                extra={'host': self.host, 'queue': self.queue_name}
+            )
         except Exception as e:
-            logger.error(f"Falha ao conectar com o RabbitMQ: {e}")
+            # --- LOG AJUSTADO ---
+            logger.error(
+                "falha ao conectar com o rabbitmq", 
+                extra={'error_message': str(e), 'error_type': type(e).__name__}
+            )
             raise
 
     def publish(self, msg: dict):
-        """Publica uma mensagem, reutilizando a conexão existente."""
+        """Publica uma mensagem com lógica de reconexão e retentativa."""
         try:
             if not self._connection or self._connection.is_closed:
-                logger.warning("Conexão com RabbitMQ perdida. Tentando reconectar...")
+                # --- LOG AJUSTADO ---
+                logger.warning(
+                    "conexao com rabbitmq perdida ou fechada", 
+                    extra={'reason': 'reconnecting'}
+                )
                 self.connect()
 
             self._channel.basic_publish(
@@ -49,14 +62,35 @@ class RabbitMQProducer:
                 body=json.dumps(msg),
                 properties=pika.BasicProperties(delivery_mode=pika.spec.PERSISTENT_DELIVERY_MODE)
             )
+        except (pika.exceptions.StreamLostError, pika.exceptions.ChannelClosed) as e:
+            # --- LOG AJUSTADO ---
+            logger.error(
+                "conexao perdida ao tentar publicar",
+                extra={'error_message': str(e), 'error_type': type(e).__name__, 'reason': 'reconnecting_and_retrying'}
+            )
+            self.connect()
+            logger.info("reconexao bem-sucedida, reenviando mensagem")
+            # Tenta publicar novamente após a reconexão
+            self._channel.basic_publish(
+                exchange='',
+                routing_key=self.queue_name,
+                body=json.dumps(msg),
+                properties=pika.BasicProperties(delivery_mode=pika.spec.PERSISTENT_DELIVERY_MODE)
+            )
         except Exception as e:
-            logger.error(f"Erro ao publicar mensagem no RabbitMQ: {e}")
-            # Em caso de falha, é uma boa prática tentar reconectar na próxima vez
-            self._connection = None 
+            # --- LOG AJUSTADO ---
+            logger.error(
+                "erro inesperado ao publicar no rabbitmq",
+                extra={'error_message': str(e), 'error_type': type(e).__name__}
+            )
             raise
 
     def close(self):
         """Fecha a conexão com o RabbitMQ."""
         if self._connection and self._connection.is_open:
             self._connection.close()
-            logger.info("Conexão com RabbitMQ fechada.")
+            # --- LOG AJUSTADO ---
+            logger.info(
+                "conexao com rabbitmq fechada", 
+                extra={'host': self.host}
+            )
