@@ -32,13 +32,11 @@ class RabbitMQProducer:
             self._connection = pika.BlockingConnection(parameters)
             self._channel = self._connection.channel()
             self._channel.queue_declare(queue=self.queue_name, durable=True)
-            # --- LOG AJUSTADO ---
             logger.info(
                 "conexao com rabbitmq estabelecida",
                 extra={'host': self.host, 'queue': self.queue_name}
             )
         except Exception as e:
-            # --- LOG AJUSTADO ---
             logger.error(
                 "falha ao conectar com o rabbitmq", 
                 extra={'error_message': str(e), 'error_type': type(e).__name__}
@@ -49,7 +47,6 @@ class RabbitMQProducer:
         """Publica uma mensagem com lógica de reconexão e retentativa."""
         try:
             if not self._connection or self._connection.is_closed:
-                # --- LOG AJUSTADO ---
                 logger.warning(
                     "conexao com rabbitmq perdida ou fechada", 
                     extra={'reason': 'reconnecting'}
@@ -63,7 +60,6 @@ class RabbitMQProducer:
                 properties=pika.BasicProperties(delivery_mode=pika.spec.PERSISTENT_DELIVERY_MODE)
             )
         except (pika.exceptions.StreamLostError, pika.exceptions.ChannelClosed) as e:
-            # --- LOG AJUSTADO ---
             logger.error(
                 "conexao perdida ao tentar publicar",
                 extra={'error_message': str(e), 'error_type': type(e).__name__, 'reason': 'reconnecting_and_retrying'}
@@ -78,7 +74,6 @@ class RabbitMQProducer:
                 properties=pika.BasicProperties(delivery_mode=pika.spec.PERSISTENT_DELIVERY_MODE)
             )
         except Exception as e:
-            # --- LOG AJUSTADO ---
             logger.error(
                 "erro inesperado ao publicar no rabbitmq",
                 extra={'error_message': str(e), 'error_type': type(e).__name__}

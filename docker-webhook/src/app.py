@@ -1,5 +1,3 @@
-# Em src/app.py (Versão com Logging Estruturado)
-
 from flask import Flask, request, jsonify
 import os
 from dotenv import load_dotenv
@@ -15,8 +13,6 @@ from .utils.validators import validate_whatsapp_payload
 # Carrega variáveis de ambiente
 load_dotenv()
 
-# --- MUDANÇA PRINCIPAL NO LOGGING ---
-# Substituímos o logging.basicConfig por nosso logger JSON
 logger = get_logger(__name__)
 
 app = Flask(__name__)
@@ -44,7 +40,6 @@ def verify_signature(request):
     if not signature:
         logger.warning("requisicao sem assinatura", extra={'ip_address': request.remote_addr})
         return False
-    # ... (o resto da função continua igual)
     sha_name, signature_hash = signature.split('=', 1)
     if sha_name != 'sha256':
         return False
@@ -54,7 +49,6 @@ def verify_signature(request):
 @app.route("/", methods=["GET", "POST"])
 def whatsapp_webhook():
     if request.method == "GET":
-        # ... (lógica do GET continua igual)
         mode = request.args.get("hub.mode")
         token = request.args.get("hub.verify_token")
         challenge = request.args.get("hub.challenge")
