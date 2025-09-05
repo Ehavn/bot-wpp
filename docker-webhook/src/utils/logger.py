@@ -1,5 +1,3 @@
-# Em src/utils/logger.py
-
 import logging
 from pythonjsonlogger import jsonlogger
 import sys
