@@ -1,5 +1,3 @@
-# src/utils/validators.py (Corrigido)
-
 import logging
 
 logger = logging.getLogger(__name__)
