@@ -30,6 +30,7 @@ class WhatsAppChat:
             "type": "text",
             "text": {"body": text}
         }
+        print(payload)
 
         if self.debug:
             print(f"\n=== Enviando mensagem para {recipient_phone} ===")
