@@ -1,6 +1,18 @@
+# Core Flask and Web Server
 flask==3.0.0
-pika==1.3.2
-python-dotenv==1.0.1
-python-json-logger==2.0.7
 gunicorn==22.0.0
 gevent==24.2.1
+
+# Messaging Queue
+pika==1.3.2
+
+# Configuration and Logging
+python-dotenv==1.0.1
+python-json-logger==2.0.7
+
+# --- Novas Adições ---
+# Application Security
+flask-limiter==3.5.0
+
+# Build Tools
+pip-tools==7.4.1

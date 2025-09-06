@@ -4,6 +4,8 @@ from dotenv import load_dotenv
 from pika.exceptions import AMQPConnectionError
 import hmac
 import hashlib
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from .utils.logger import get_logger
 from .producer.rabbitmq import RabbitMQProducer
 from .utils.validators import validate_whatsapp_payload
@@ -17,6 +19,14 @@ logger = get_logger(__name__)
 # Inicializa a aplicação Flask
 app = Flask(__name__)
 
+# --- Configuração do Rate Limiter (Ajustado) ---
+limiter = Limiter(
+    get_remote_address, # Usa o endereço de IP como chave
+    app=app,
+    default_limits=["20 per second"], # Define o limite padrão para 20 requisições por segundo
+    storage_uri=os.getenv("RATE_LIMIT_STORAGE_URI", "memory://")
+)
+
 # Tenta carregar as configurações essenciais e conectar ao RabbitMQ ao iniciar
 try:
     VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
@@ -28,7 +38,6 @@ try:
     rabbit_producer = RabbitMQProducer()
 
 except (ValueError, AMQPConnectionError) as e:
-    # Se a inicialização falhar, o serviço não deve iniciar.
     logger.critical(
         "falha critica na inicializacao",
         extra={'error_message': str(e), 'error_type': type(e).__name__}
@@ -36,7 +45,7 @@ except (ValueError, AMQPConnectionError) as e:
     exit(1)
 
 def verify_signature(request):
-    """Verifica a assinatura HMAC SHA256 da requisição para garantir que ela veio do WhatsApp."""
+    """Verifica a assinatura HMAC SHA256 da requisição."""
     signature = request.headers.get("X-Hub-Signature-256")
     if not signature:
         logger.warning("requisicao sem assinatura", extra={'ip_address': request.remote_addr})
@@ -51,15 +60,16 @@ def verify_signature(request):
     return hmac.compare_digest(signature_hash, mac.hexdigest())
 
 @app.route("/health", methods=["GET"])
+@limiter.exempt # Isenta o health check dos limites de taxa
 def health_check():
     """Endpoint simples para verificação de saúde (health check)."""
     return jsonify({"status": "healthy"}), 200
 
 @app.route("/", methods=["GET", "POST"])
+# Esta rota agora usará o limite padrão de "20 per second" definido acima
 def whatsapp_webhook():
-    """Rota principal que lida com a verificação do webhook (GET) e o recebimento de notificações (POST)."""
+    """Rota principal que lida com o webhook do WhatsApp."""
     if request.method == "GET":
-        # Lógica de verificação do webhook (quando você configura na plataforma da Meta)
         mode = request.args.get("hub.mode")
         token = request.args.get("hub.verify_token")
         challenge = request.args.get("hub.challenge")
@@ -72,12 +82,10 @@ def whatsapp_webhook():
             return "Verification failed", 403
 
     if request.method == "POST":
-        # Validação de segurança da assinatura
         if not verify_signature(request):
             logger.error("assinatura invalida", extra={'ip_address': request.remote_addr})
             return "Invalid signature", 403
         
-        # Tenta fazer o parse do corpo da requisição para JSON
         try:
             dados = request.get_json()
         except Exception as e:
@@ -87,32 +95,26 @@ def whatsapp_webhook():
             )
             return jsonify({"error": "JSON malformado ou Content-Type inválido."}), 400
         
-        # Validação da estrutura do payload
         if not validate_whatsapp_payload(dados):
             logger.error(
                 "payload invalido", 
-                extra={
-                    'ip_address': request.remote_addr, 
-                    'payload_snippet': str(dados)[:200]
-                }
+                extra={'ip_address': request.remote_addr, 'payload_snippet': str(dados)[:200]}
             )
             return jsonify({"error": "Payload JSON inválido"}), 400
 
         try:
-            # Lógica de extração ajustada para o payload real
-            messages = dados["value"]["messages"]
-            for msg in messages:
-                rabbit_producer.publish(msg)
+            # 1. Extrai a lista de mensagens do payload
+            messages_to_publish = dados["value"]["messages"]
+
+            # 2. Publica a LISTA inteira como uma única mensagem
+            rabbit_producer.publish(messages_to_publish)
             
+            # 3. Atualiza o log para refletir a ação
             logger.info(
-                "mensagens publicadas na fila", 
-                extra={
-                    'message_count': len(messages),
-                    'wamid': messages[0].get('id'),
-                    'recipient_phone': messages[0].get('from')
-                }
+                "lista de mensagens publicada na fila com sucesso", 
+                extra={'message_count': len(messages_to_publish)}
             )
-            return jsonify({"status": "ok"}), 200
+            return jsonify({"status": "Recebido Com Sucesso"}), 200
         except Exception as e:
             logger.exception(
                 "erro interno ao processar mensagens",
@@ -123,7 +125,6 @@ def whatsapp_webhook():
     return "Método não suportado", 405
 
 if __name__ == "__main__":
-    # Inicia a aplicação. As configurações de porta e debug são lidas das variáveis de ambiente.
     port = int(os.getenv("PORT", 5000))
     debug_mode = os.getenv("FLASK_DEBUG", "False").lower() in ('true', '1', 't')
     app.run(debug=debug_mode, port=port, host="0.0.0.0")

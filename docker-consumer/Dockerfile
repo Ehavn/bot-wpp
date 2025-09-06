@@ -1,24 +1,44 @@
-# Usa a imagem base do Python 3.11 slim
-FROM python:3.11-slim
+# Dockerfile
 
-# Define o diretório de trabalho
-WORKDIR /app
+# ---- Estágio 1: Build ----
+# Usamos uma imagem completa para instalar as dependências
+FROM python:3.11 as builder
 
-# Instala dependências do sistema necessárias para compilação de pacotes
-RUN apt-get update && apt-get install -y \
-    gcc \
-    libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
+WORKDIR /usr/src/app
 
-# Copia o arquivo de dependências primeiro para otimizar o cache
+# Cria e ativa um ambiente virtual
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Instala as dependências de forma otimizada
 COPY requirements.txt .
-
-# Instala as dependências Python
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copia os arquivos do projeto para o container
-COPY config/ ./config/
-COPY src/ ./src/
 
-# Comando que inicia a aplicação consumidora
-CMD ["python", "src/app.py"]
+# ---- Estágio 2: Final ----
+# Usamos uma imagem 'slim' para a versão final
+FROM python:3.11-slim
+
+# Evita que o Python gere arquivos .pyc e bufferize logs
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+WORKDIR /app
+
+# Cria um usuário não-root para máxima segurança
+RUN useradd --create-home appuser
+USER appuser
+
+# Copia o ambiente virtual com as dependências do estágio de build
+COPY --from=builder /opt/venv /opt/venv
+
+# Copia apenas o código-fonte necessário para a execução
+COPY --chown=appuser:appuser src/ ./src
+COPY --chown=appuser:appuser app.py .
+
+# Define o caminho para usar os pacotes do ambiente virtual
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Comando para executar a aplicação.
+# O app.py agora inicia apenas um processo, que é o ideal para contêineres.
+CMD ["python", "app.py"]

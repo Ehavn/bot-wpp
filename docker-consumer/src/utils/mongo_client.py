@@ -1,43 +1,24 @@
-import json
-import os
+# src/utils/mongo_client.py
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
+from .logger import get_logger
+from ..config import settings # Importa as configurações centralizadas
 
-def load_mongo_config():
-    """
-    Carrega a seção 'mongo' do config.json de forma segura,
-    calculando o caminho a partir da localização deste script.
-    """
-    try:
-        config_path = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'config.json')
-        
-        with open(config_path, "r", encoding="utf-8") as f:
-            config = json.load(f)
-        
-        return config["mongo"]
-
-    except FileNotFoundError:
-        # logger.critical("ERRO: 'config/config.json' não foi encontrado.")
-        raise  # Re-lança a exceção para interromper a execução
-    except KeyError:
-        # logger.critical("ERRO: A chave 'mongo' não foi encontrada no config.json.")
-        raise
+logger = get_logger(__name__)
 
 def get_mongo_client():
     """
-    Cria e retorna um cliente do MongoDB e sua configuração.
+    Cria e retorna um cliente do MongoDB usando as configurações centralizadas.
     """
-    config = load_mongo_config()
-    connection_uri = config.get("connectionUri")
-    if not connection_uri:
-        raise ValueError("'connectionUri' não encontrado na configuração do MongoDB.")
-
     try:
-        client = MongoClient(connection_uri)
-        # 2. Testa a conexão para garantir que está funcionando antes de continuar
-        client.admin.command('ping')
-        # logger.info("Conexão com MongoDB estabelecida com sucesso.")
-        return client, config
+        # A validação da URI já foi feita pelo Pydantic ao iniciar a app.
+        client = MongoClient(settings.mongo.connection_uri)
+        client.admin.command('ping') 
+        logger.info("Conexão com MongoDB estabelecida com sucesso.")
+        
+        # Retorna o cliente e um dicionário com as configurações do Mongo.
+        return client, settings.mongo.model_dump()
+        
     except ConnectionFailure as e:
-        # logger.critical(f"Falha ao conectar ao MongoDB: {e}")
+        logger.critical("Falha ao conectar ao MongoDB.", extra={'error': str(e)})
         raise
