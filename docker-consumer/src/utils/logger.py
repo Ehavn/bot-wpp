@@ -1,5 +1,5 @@
 import logging
-from python_json_logger import jsonlogger
+from pythonjsonlogger import jsonlogger
 
 def get_logger(name="app"):
     """Configura e retorna um logger que formata mensagens em JSON."""

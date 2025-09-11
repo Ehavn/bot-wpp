@@ -10,7 +10,6 @@ WORKDIR /usr/src/app
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# --- MELHORIA 1: Usar requirements.lock ---
 # Copia o arquivo de lock para garantir builds 100% reproduzíveis.
 COPY requirements.lock .
 # Instala as dependências a partir do arquivo de lock.
@@ -30,7 +29,6 @@ RUN useradd --create-home appuser
 # Copia o ambiente virtual com as dependências do estágio de build.
 COPY --from=builder /opt/venv /opt/venv
 
-# --- MELHORIA 2: Usar entrypoint.sh ---
 # Copia o código da aplicação e o script de entrypoint.
 COPY ./src .
 COPY entrypoint.sh .

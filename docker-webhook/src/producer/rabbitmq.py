@@ -42,7 +42,8 @@ class RabbitMQProducer:
                 )
                 self._connection = pika.BlockingConnection(parameters)
                 self._channel = self._connection.channel()
-                self._channel.queue_declare(queue=self.queue_name, durable=True)
+                dlx_args = {'x-dead-letter-exchange': 'dlx_exchange'}
+                self._channel.queue_declare(queue='new_messages', durable=True, arguments=dlx_args)
                 logger.info(
                     "Conexão com RabbitMQ estabelecida.",
                     extra={'host': self.host, 'queue': self.queue_name}

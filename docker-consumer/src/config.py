@@ -1,41 +1,68 @@
-import os
+from pathlib import Path
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import BaseModel
+from src.utils.secrets import get_secret
 
-# Garante que o .env seja lido. O Pydantic-Settings fará isso automaticamente
-# se python-dotenv estiver instalado, mas podemos ser explícitos.
-from dotenv import load_dotenv
-load_dotenv()
+# Caminho para o .env local
+BASE_DIR = Path(__file__).resolve().parent.parent
+ENV_FILE_PATH = BASE_DIR / ".env"
 
-class RabbitMQSettings(BaseModel):
-    """Configurações específicas do RabbitMQ."""
-    host: str = os.getenv("RABBIT_HOST", "localhost")
-    user: str = os.getenv("RABBIT_USER", "guest")
-    password: str = os.getenv("RABBIT_PASS", "guest")
-    queue: str = os.getenv("RABBIT_QUEUE_MESSAGES", "new_messages")
-    queue_error: str = os.getenv("RABBIT_QUEUE_ERROR", "failed_messages")
+# -----------------------------
+# Configurações RabbitMQ
+# -----------------------------
+class RabbitMQSettings(BaseSettings):
+    host: str
+    user: str
+    password: str = Field(alias="RABBIT_PASS")
+    queue_messages: str
+    queue_error: str
 
-class MongoSettings(BaseModel):
-    """Configurações específicas do MongoDB."""
-    connection_uri: str = os.getenv("MONGO_CONNECTION_URI")
-    db_name: str = os.getenv("MONGO_DB_NAME", "messages")
-    collection_messages: str = os.getenv("MONGO_COLLECTION_MESSAGES", "raw")
-
-
-class AppSettings(BaseSettings):
-    """
-    Classe principal que carrega todas as configurações da aplicação.
-    Ela automaticamente buscará variáveis de ambiente correspondentes.
-    """
-    rabbitmq: RabbitMQSettings = RabbitMQSettings()
-    mongo: MongoSettings = MongoSettings()
-    
     model_config = SettingsConfigDict(
-        env_file=".env", 
-        env_nested_delimiter='__'
+        env_prefix="RABBIT_",
+        env_file=str(ENV_FILE_PATH),
+        extra="allow"  # Permite que variáveis do Mongo ou outras extras não quebrem
     )
 
-# Instância única que será importada em toda a aplicação.
-# O Pydantic garante que, se uma variável obrigatória (ex: MONGO_CONNECTION_URI)
-# não for encontrada, a aplicação falhará ao iniciar com um erro claro.
+# -----------------------------
+# Configurações MongoDB
+# -----------------------------
+class MongoSettings(BaseSettings):
+    connection_uri: str
+    db_name: str
+    collection_messages: str
+
+    model_config = SettingsConfigDict(
+        env_prefix="MONGO_",
+        env_file=str(ENV_FILE_PATH),
+        extra="allow"
+    )
+
+# -----------------------------
+# Configurações da Aplicação
+# -----------------------------
+class AppSettings(BaseSettings):
+    rabbitmq: RabbitMQSettings = RabbitMQSettings()
+    mongo: MongoSettings = MongoSettings()
+
+    model_config = SettingsConfigDict(
+        env_nested_delimiter="__",
+        extra="allow"  # Evita erro se houver outras variáveis no .env
+    )
+
+# Instância global de configurações
 settings = AppSettings()
+
+# -----------------------------
+# Sobrescreve com secrets em produção
+# -----------------------------
+try:
+    if get_secret("ENVIRONMENT") == "production":
+        # RabbitMQ
+        settings.rabbitmq.user = get_secret("RABBIT_USER") or settings.rabbitmq.user
+        settings.rabbitmq.password = get_secret("RABBIT_PASS") or settings.rabbitmq.password
+
+        # MongoDB
+        settings.mongo.connection_uri = get_secret("MONGO_CONNECTION_URI") or settings.mongo.connection_uri
+except Exception:
+    # Se não estiver em produção ou falhar o get_secret, mantém valores do .env
+    pass

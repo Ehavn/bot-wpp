@@ -1,6 +1,9 @@
-pika==1.3.2
-pymongo==4.6.1
-python-dotenv==1.0.1
-python-json-logger==2.0.7
-pydantic==2.10.13
-pydantic-settings==2.3.4
+pika
+pymongo
+python-dotenv
+python-json-logger
+pydantic
+pydantic-settings
+google-cloud-secret-manager
+prometheus-client
+pytest
