@@ -1,37 +1,23 @@
-# docker-compose.yml
-version: '3.8'
+# Arquivo: docker-compose.yml (Versão APENAS para os Consumers)
 
 services:
-  # Serviço do RabbitMQ para ambiente de desenvolvimento
-  rabbitmq:
-    image: rabbitmq:3.11-management
-    container_name: rabbitmq
-    ports:
-      - "5672:5672"   # Porta para a aplicação
-      - "15672:15672" # Interface de gerenciamento web
+  worker_preparer:
+    build: .
+    # A lógica de retry no código cuidará de esperar pela conexão.
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBIT_USER:-admin}
-      RABBITMQ_DEFAULT_PASS: ${RABBIT_PASS:-admin}
-    networks:
-      - app-network
+      - MONGO_CONNECTION_URI=${MONGO_CONNECTION_URI}
+      - RABBIT_HOST=${RABBIT_HOST}
+      - RABBIT_USER=${RABBIT_USER}
+      - RABBIT_PASS=${RABBIT_PASS}
+      - APP_ENTRYPOINT=src.run_preparer_worker  # <-- CORRIGIDO
 
-  # Nosso serviço consumidor escalável
-  consumer:
-    build: . # Constrói a imagem a partir do Dockerfile na raiz do projeto
-    container_name: docker-consumer
-    # Depende do rabbitmq estar pronto para iniciar
-    depends_on:
-      - rabbitmq
-    # Passa as variáveis de ambiente do arquivo .env para o contêiner
-    env_file:
-      - .env
-    networks:
-      - app-network
-    # A mágica da escalabilidade acontece aqui.
-    # No terminal, você usará o comando:
-    # docker-compose up --build --scale consumer=4 
-    # para iniciar 4 instâncias do seu consumidor.
-
-networks:
-  app-network:
-    driver: bridge
+  worker_ai:
+    build: .
+    deploy:
+      replicas: 2
+    environment:
+      - MONGO_CONNECTION_URI=${MONGO_CONNECTION_URI}
+      - RABBIT_HOST=${RABBIT_HOST}
+      - RABBIT_USER=${RABBIT_USER}
+      - RABBIT_PASS=${RABBIT_PASS}
+      - APP_ENTRYPOINT=src.run_ai_worker

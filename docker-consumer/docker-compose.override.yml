@@ -1,0 +1,14 @@
+# Arquivo: docker-compose.override.yml (Apenas para Desenvolvimento)
+
+version: '3.8'
+
+services:
+  worker_preparer:
+    volumes:
+      - ./src:/app/src
+      - ./config:/app/config
+
+  worker_ai:
+    volumes:
+      - ./src:/app/src
+      - ./config:/app/config

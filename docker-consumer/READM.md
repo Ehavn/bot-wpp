@@ -1,137 +1,103 @@
-## 📥 Docker Consumer - RabbitMQ to MongoDB
-Este serviço atua como um consumidor, responsável por processar mensagens de uma fila RabbitMQ e armazená-las de forma segura em um banco de dados MongoDB Atlas. Cada mensagem recebida é enriquecida com um status inicial "pending" antes de ser persistida.
+## 📨 Microsserviço Preparador de Mensagens
+Este serviço atua como o primeiro estágio em um pipeline de processamento de mensagens. Sua principal responsabilidade é consumir mensagens pendentes do MongoDB, enriquecê-las e prepará-las para o próximo estágio do processo, que envolve a interação com uma Inteligência Artificial.
+
+## 📜 Descrição
+O projeto opera em um fluxo contínuo e orientado a eventos:
+
+Consumo: O serviço verifica continuamente o MongoDB em busca de mensagens com o status "pending".
+
+Enriquecimento: Para cada mensagem encontrada, o serviço executa duas tarefas principais:
+
+Busca de Histórico: Consulta o MongoDB para recuperar o histórico de conversas anteriores do mesmo remetente.
+
+Sanitização: Mascara dados sensíveis no conteúdo da mensagem atual, como e-mails e CPFs, para proteger a privacidade.
+
+Publicação: Por fim, ele empacota a mensagem atual sanitizada junto com o histórico e publica este pacote completo em uma segunda fila do RabbitMQ (ia_messages), de onde será consumido pela próxima aplicação do pipeline (Worker AI).
+
+Atualização de Status: Após o processamento, a mensagem original no MongoDB é marcada como "processed" ou "failed".
+
+Este design desacopla a recepção da mensagem do seu processamento final, garantindo um sistema mais resiliente, escalável e de fácil manutenção.
 
 ## 📂 Estrutura do Projeto
 .
 ├── config/
-│   └── config.json         # Configurações NÃO-SENSÍVEIS da aplicação
+│   └── config.json
 ├── src/
-│   ├── app.py              # Entrypoint principal que inicia o consumidor
-│   ├── consumer/
-│   │   └── rabbitmq_consumer.py # Lógica de consumo e inserção no MongoDB
-│   └── utils/
-│       ├── mongo_client.py     # Lógica de conexão com MongoDB
-│       └── logger.py           # Configuração de logs
-├── .env                    # Arquivo para armazenar segredos (NÃO versionado)
-├── requirements.txt        # Dependências Python
-├── Dockerfile              # Configuração de build do container
+│   ├── dao/
+│   │   └── message_dao.py
+│   ├── services/
+│   │   ├── sanitizer.py
+│   │   ├── worker_ai.py
+│   │   └── worker_preparer.py
+│   ├── utils/
+│   │   ├── logger.py
+│   │   ├── mongo_client.py
+│   │   └── rabbit_client.py
+│   └── app.py
+├── Dockerfile
+├── requirements.txt
 └── README.md
+## 🛠️ Tecnologias Utilizadas
+Python 3.11
+
+Pika: Biblioteca para comunicação com o RabbitMQ.
+
+
+PyMongo: Biblioteca para comunicação com o MongoDB. 
+
+RabbitMQ: Broker de mensagens para o fluxo de eventos.
+
+MongoDB: Banco de dados para armazenamento do histórico.
+
+
+Docker: Para containerização da aplicação. 
 
 ## ⚙️ Configuração
-A configuração do projeto é dividida em dois arquivos para máxima segurança:
-
-1.  `config/config.json`: Armazena configurações **não-sensíveis**, como nomes de filas e bancos de dados. Este arquivo pode ser versionado no Git.
-2.  `.env`: Armazena **segredos** (senhas, chaves de API, URIs de conexão). **Este arquivo nunca deve ser enviado para o Git** e precisa ser criado manualmente em cada ambiente.
-
-**Exemplo do arquivo `.env`:**
-```ini
-# Configurações do RabbitMQ
-RABBIT_HOST=localhost
-RABBIT_USER=admin
-RABBIT_PASS=admin
-
-# Configuração do Mongo
-MONGO_CONNECTION_URI="mongodb+srv://usuario:senha@cluster.mongodb.net/..."
-▶️ Executando Localmente
-Criar e ativar o ambiente virtual
-Bash
-
-python -m venv venv
-source venv/bin/activate   # Linux/Mac
-# venv\Scripts\activate      # Windows
-Instalar pacotes
-Bash
-
-pip install -r requirements.txt
-Iniciar o consumidor
-Bash
-
-python src/app.py
-🐳 Executando com Docker
-Build da imagem Docker:
-
-Bash
-
-docker build -t rabbitmq-consumer .
-Rodar o container:
-Para rodar o container, você precisa passar as variáveis de ambiente do seu arquivo .env.
-
-Bash
-
-docker run --rm --name consumer-instance \
-  --env-file .env \
-  rabbitmq-consumer
-📝 Logs
-Os logs são enviados para a saída padrão (stdout) em formato JSON estruturado, ideal para integração com plataformas de monitoramento como Datadog, Splunk ou a stack ELK.
-
-Exemplo de saída:
+Antes de executar, crie uma pasta config na raiz do projeto e, dentro dela, um arquivo config.json com a estrutura abaixo, substituindo os valores pelos da sua infraestrutura.
 
 JSON
 
-{"asctime": "2025-09-05 19:15:00,123", "name": "app", "levelname": "INFO", "message": "iniciando consumidor..."}
-{"asctime": "2025-09-05 19:15:01,456", "name": "src.utils.mongo_client", "levelname": "INFO", "message": "conexao com mongodb estabelecida com sucesso"}
-{"asctime": "2025-09-05 19:15:02,789", "name": "src.consumer.rabbitmq_consumer", "levelname": "INFO", "message": "consumidor iniciado, aguardando mensagens..."}
-{"asctime": "2025-09-05 19:15:10,321", "name": "src.consumer.rabbitmq_consumer", "levelname": "INFO", "message": "mensagem recebida", "body_snippet": "b'{\"id\": \"msg1\"}'"}
-{"asctime": "2025-09-05 19:15:10,325", "name": "src.consumer.rabbitmq_consumer", "levelname": "INFO", "message": "documento inserido no mongodb", "inserted_id": "68e8e2c8a7b3f9b2f3e1a1b8"}
-📌 Fluxo de Processamento
-O consumidor estabelece conexões com o RabbitMQ e o MongoDB.
+{
+  "mongo": {
+    "connectionUri": "mongodb+srv://user:pass@cluster.mongodb.net/your_db",
+    "db_name": "messages",
+    "collection_raw": "raw"
+  },
+  "rabbitmq": {
+    "host": "localhost",
+    "user": "admin",
+    "password": "admin",
+    "queue_new_messages": "new_messages",
+    "queue_ia_messages": "ia_messages"
+  }
+}
+## 🚀 Como Executar
+- 1. Execução Local
+Bash
 
-Ele fica escutando ativamente a fila new_messages.
+- - Clone o repositório e navegue até a pasta
+git clone <url-do-seu-repositorio>
+cd <nome-do-repositorio>
 
-Ao receber uma mensagem, o corpo é decodificado e enriquecido.
+- - Crie e ative um ambiente virtual
+python -m venv venv
+source venv/bin/activate  # No Windows: venv\Scripts\activate
 
-A mensagem enriquecida é inserida na coleção raw do MongoDB.
+- - Instale as dependências
+pip install -r requirements.txt
 
-Em caso de falha no processamento, a mensagem é redirecionada para a fila failed_messages para análise posterior.
+- - Inicie um servidor RabbitMQ (exemplo com Docker)
+docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management
 
-Um ack (acknowledgment) é enviado ao RabbitMQ para remover a mensagem da fila principal.
+- - Execute a aplicação
+python src/app.py
+- 2. Execução com Docker
+Bash
 
+- - Construa a imagem Docker a partir da raiz do projeto
+docker build -t preparador-mensagens .
 
----
-
-### 2. `Dockerfile` (Versão Final)
-A única mudança aqui é a adição de `exec` ao `CMD` para garantir um encerramento mais limpo do container.
-
-```dockerfile
-# Dockerfile Otimizado com Múltiplos Estágios
-
-# ---- Estágio 1: Build ----
-# Usamos uma imagem completa para instalar as dependências, que pode ser descartada depois.
-FROM python:3.11 as builder
-
-WORKDIR /usr/src/app
-
-# Instala as dependências de forma segura em um ambiente virtual
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
-# Copia e instala as dependências
-COPY requirements.txt .
-# Instala dependências de build, instala pacotes Python, e depois remove as de build
-RUN apt-get update && apt-get install -y --no-install-recommends gcc libssl-dev && \
-    pip install --no-cache-dir -r requirements.txt && \
-    apt-get purge -y gcc libssl-dev && \
-    apt-get autoremove -y && \
-    rm -rf /var/lib/apt/lists/*
-
-# ---- Estágio 2: Final ----
-# Usamos uma imagem 'slim' que é muito menor para a versão final.
-FROM python:3.11-slim
-
-ENV PYTHONUNBUFFERED True
-WORKDIR /app
-
-# Cria um usuário não-root para segurança
-RUN useradd --create-home appuser
-USER appuser
-
-# Copia o ambiente virtual com as dependências do estágio de build
-COPY --from=builder /opt/venv /opt/venv
-
-# Copia o código da aplicação e o config não-sensível
-COPY config/ ./config/
-COPY src/ ./src/
-
-# Define o caminho para usar os pacotes do ambiente virtual e executa a aplicação
-ENV PATH="/opt/venv/bin:$PATH"
-CMD ["exec", "python", "src/app.py"]
+- - Execute o contêiner
+- - (Certifique-se de que o RabbitMQ e o MongoDB estejam acessíveis)
+- - Para conectar a serviços no localhost da sua máquina, use --network host
+docker run --name meu-preparador --network host -d preparador-mensagens

@@ -1,41 +1,29 @@
-# Define a versão do Docker Compose a ser usada. A 3.8 é moderna e estável.
-version: '3.8'
-
-# A seção 'services' é onde definimos todos os contêineres que compõem nossa aplicação.
+# Arquivo: docker-compose.yml (Versão Corrigida)
 services:
-  # 1. O serviço do RabbitMQ
   rabbitmq:
-    # Usa a imagem oficial do RabbitMQ com a interface de gerenciamento inclusa.
     image: rabbitmq:3.11-management
     container_name: rabbitmq
     hostname: rabbitmq
-    # Define as credenciais padrão do RabbitMQ.
-    # Estes valores DEVEM ser os mesmos do seu arquivo .env para que a aplicação consiga conectar.
+    ports:
+      - "5672:5672"
+      - "15672:15672"
     environment:
+      # Use as variáveis corrigidas do arquivo .env
       - RABBITMQ_DEFAULT_USER=${RABBIT_USER}
       - RABBITMQ_DEFAULT_PASS=${RABBIT_PASS}
-    ports:
-      # Expõe a porta do protocolo AMQP para a máquina local (opcional, bom para debug).
-      - "5672:5672"
-      # Expõe a porta da interface de gerenciamento web. Acesse em http://localhost:15672.
-      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # 2. O serviço da sua aplicação Flask (webhook)
   webapp:
-    # 'build: .' instrui o Compose a construir a imagem a partir do Dockerfile
-    # que está no diretório atual.
     build: .
     container_name: whatsapp_webhook
-    # 'env_file' é a instrução chave!
-    # O Docker Compose vai ler o arquivo .env e injetar todas as variáveis
-    # que estão nele diretamente no ambiente do contêiner da webapp.
+    ports:
+      - "${PORT}:${PORT}"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     env_file:
       - ./.env
-    ports:
-      # Mapeia a porta 5000 do contêiner para a porta 5000 da sua máquina local.
-      - "${PORT}:${PORT}"
-    # 'depends_on' garante que o contêiner do RabbitMQ será iniciado ANTES
-    # do contêiner da sua aplicação. Isso evita que a aplicação falhe ao iniciar
-    # porque o RabbitMQ ainda não está pronto.
-    depends_on:
-      - rabbitmq

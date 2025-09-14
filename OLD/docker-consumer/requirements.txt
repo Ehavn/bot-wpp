@@ -1,0 +1,9 @@
+pika
+pymongo
+python-dotenv
+python-json-logger
+pydantic
+pydantic-settings
+google-cloud-secret-manager
+prometheus-client
+pytest

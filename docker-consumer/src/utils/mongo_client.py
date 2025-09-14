@@ -1,23 +1,33 @@
-# src/utils/mongo_client.py
+# Arquivo: src/utils/mongo_client.py (Refatorado com config central)
+
+import time
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
-from src.utils.logger import get_logger
-from src.config import settings # Importa as configurações centralizadas
-
-logger = get_logger(__name__)
+from src.config import config  # Importa a configuração centralizada
 
 def get_mongo_client():
     """
-    Cria e retorna um cliente do MongoDB usando as configurações centralizadas.
+    Cria e retorna um cliente do MongoDB usando a configuração centralizada.
+    Inclui lógica de retentativas.
     """
-    try:
-        client = MongoClient(settings.mongo.connection_uri)
-        client.admin.command('ping') 
-        logger.info("Conexão com MongoDB estabelecida com sucesso.")
-        
-        # Retorna o cliente e um dicionário com as configurações do Mongo
-        return client, settings.mongo.model_dump()
-        
-    except ConnectionFailure as e:
-        logger.critical("Falha ao conectar ao MongoDB.", extra={'error': str(e)})
-        raise
+    max_retries = 5
+    last_exception = None
+    for attempt in range(max_retries):
+        try:
+            # Usa o atributo diretamente do objeto config
+            client = MongoClient(config.MONGO_URI, serverSelectionTimeoutMS=5000)
+            client.admin.command('ping')
+            print("Conexão com MongoDB estabelecida com sucesso.")
+            # Retorna o cliente e um dicionário simples com os outros dados
+            mongo_config = {
+                "db_name": config.MONGO_DB_NAME,
+                "collection_raw": config.MONGO_COLLECTION_RAW
+            }
+            return client, mongo_config
+        except ConnectionFailure as e:
+            last_exception = e
+            wait_time = 2 ** attempt
+            print(f"Falha ao conectar ao MongoDB (tentativa {attempt + 1}/{max_retries}). Tentando novamente em {wait_time} segundos... Erro: {e}")
+            time.sleep(wait_time)
+            
+    raise ConnectionFailure(f"Não foi possível conectar ao MongoDB após {max_retries} tentativas.") from last_exception

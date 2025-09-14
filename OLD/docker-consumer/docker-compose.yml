@@ -1,0 +1,37 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  # Serviço do RabbitMQ para ambiente de desenvolvimento
+  rabbitmq:
+    image: rabbitmq:3.11-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"   # Porta para a aplicação
+      - "15672:15672" # Interface de gerenciamento web
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBIT_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBIT_PASS:-admin}
+    networks:
+      - app-network
+
+  # Nosso serviço consumidor escalável
+  consumer:
+    build: . # Constrói a imagem a partir do Dockerfile na raiz do projeto
+    container_name: docker-consumer
+    # Depende do rabbitmq estar pronto para iniciar
+    depends_on:
+      - rabbitmq
+    # Passa as variáveis de ambiente do arquivo .env para o contêiner
+    env_file:
+      - .env
+    networks:
+      - app-network
+    # A mágica da escalabilidade acontece aqui.
+    # No terminal, você usará o comando:
+    # docker-compose up --build --scale consumer=4 
+    # para iniciar 4 instâncias do seu consumidor.
+
+networks:
+  app-network:
+    driver: bridge

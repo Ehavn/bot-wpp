@@ -1,0 +1,21 @@
+# Arquivo: src/services/sanitizer.py (Aprimorado)
+
+import re
+
+class Sanitizer:
+    def __init__(self):
+        # Padrões de Regex aprimorados para maior precisão
+        self.patterns = {
+            # Este padrão busca por um formato mais parecido com um CPF, com pontos e traço opcionais.
+            # Reduz falsos positivos em números de protocolo ou outros códigos numéricos.
+            "cpf": re.compile(r'\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b'),
+            "email": re.compile(r'\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b'),
+            # Este padrão é um pouco mais flexível para telefones, incluindo o nono dígito opcional
+            "phone": re.compile(r'\b(?:\(?\d{2}\)?\s?)?(?:9\d{4}|\d{4})-?\d{4}\b')
+        }
+
+    def sanitize(self, text: str) -> str:
+        sanitized_text = text
+        for key, pattern in self.patterns.items():
+            sanitized_text = pattern.sub(f"***MASKED_{key.upper()}***", sanitized_text)
+        return sanitized_text

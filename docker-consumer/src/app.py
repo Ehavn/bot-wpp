@@ -1,24 +1,23 @@
-# app.py
-from src.consumer.rabbitmq_consumer import start_consumer
-from src.utils.logger import get_logger
-from src.config import settings # Importa as configurações centralizadas
+# Arquivo: src/app.py (Ajustado)
 
-logger = get_logger("app_consumer")
+# --- ADICIONE ESTAS DUAS LINHAS NO TOPO DO ARQUIVO ---
+from dotenv import load_dotenv
+load_dotenv()
+# ---------------------------------------------------
 
-def main():
-    """
-    Função principal que inicia um único processo consumidor.
-    """
-    try:
-        # Passa o objeto de configurações do RabbitMQ diretamente.
-        # .model_dump() converte o objeto Pydantic para um dicionário, se necessário.
-        rabbit_config = settings.rabbitmq.model_dump()
-        logger.info("Configurações carregadas. Iniciando consumidor...", extra=rabbit_config)
-        start_consumer(rabbit_config)
+from flask import Flask, request, jsonify
+# ... resto dos seus imports e código do Flask ...
 
-    except Exception as e:
-        logger.critical("Erro inesperado e fatal na aplicação. Encerrando.", extra={'error': str(e)})
-        exit(1)
+# Exemplo de como seu app pode estar estruturado
+app = Flask(__name__)
 
-if __name__ == "__main__":
-    main()
+@app.route('/', methods=['POST'])
+def webhook():
+    # Sua lógica de webhook aqui...
+    data = request.json
+    print("Webhook recebido:", data)
+    # Aqui você usaria o Pika para enviar a mensagem para o RabbitMQ
+    return jsonify({"status": "success"}), 200
+
+# O Gunicorn encontrará e executará esta variável 'app'.
+# Você não precisa de um bloco if __name__ == '__main__' para o Gunicorn.
