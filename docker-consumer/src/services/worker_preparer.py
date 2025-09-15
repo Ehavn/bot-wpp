@@ -1,4 +1,4 @@
-# Arquivo: src/services/worker_preparer.py (Refatorado)
+# Arquivo: src/services/worker_preparer.py (Corrigido)
 
 import json
 import pika
@@ -38,7 +38,8 @@ class WorkerPreparer:
     def _callback(self, ch, method, properties, body):
         try:
             message_data = json.loads(body)
-            self.logger.info(f"Dados recebidos da fila '{self.rabbit_config['new_messages']}'.")
+            # CORREÇÃO: Usa a chave correta 'queue_new_messages'
+            self.logger.info(f"Dados recebidos da fila '{self.rabbit_config['queue_new_messages']}'.")
 
             messages_to_process = [message_data] if isinstance(message_data, dict) else message_data
 
@@ -88,7 +89,13 @@ class WorkerPreparer:
             "current_message": message,
             "history": history
         }
+        # CORREÇÃO: Usa a chave correta 'queue_ia_messages'
         ia_queue = self.rabbit_config.get("queue_ia_messages")
+
+        if not ia_queue:
+            self.logger.error("Nome da fila 'queue_ia_messages' não encontrado na configuração. A mensagem não será publicada.")
+            return
+
         self.channel.basic_publish(
             exchange='',
             routing_key=ia_queue,
@@ -100,37 +107,31 @@ class WorkerPreparer:
     def process_single_message(self, raw_message: dict):
         """Orquestra o processo de preparação de uma única mensagem."""
         
-        # 1. Enriquece e salva a mensagem, obtendo a versão completa do banco
         processed_message = self._save_and_enrich_message(raw_message)
         message_id = processed_message['_id']
 
-        # 2. Define o ID da conversa
         conversation_id = processed_message.get("conversationId") or processed_message.get("from")
         if not conversation_id:
             self.message_dao.mark_message_as_failed(message_id, "conversationId ou from não encontrado.")
             self.logger.warning(f"Mensagem ID [{message_id}] sem 'conversationId' ou 'from'. Marcando como falha.")
             return
         
-        # Garante que o conversationId está no documento
         processed_message["conversationId"] = conversation_id
         
-        # 3. Busca o histórico
         history = self.message_dao.get_history(conversation_id, current_id=message_id)
         self.logger.info(f"Histórico de {len(history)} mensagens encontrado para a conversa: {conversation_id}.")
         
-        # 4. Sanitiza o texto da mensagem
         processed_message = self._sanitize_message_text(processed_message)
         
-        # 5. Publica o pacote para a IA
         self._build_and_publish_package(processed_message, history)
         
-        # 6. Atualiza o status final
         self.message_dao.mark_message_as_processed(message_id)
         self.logger.info(f"Mensagem ID [{message_id}] marcada como 'processed'.")
 
     def run(self):
         self.channel.basic_qos(prefetch_count=1)
         self.channel.basic_consume(
+            # CORREÇÃO: Usa a chave correta 'queue_new_messages'
             queue=self.rabbit_config["queue_new_messages"],
             on_message_callback=self._callback
         )
