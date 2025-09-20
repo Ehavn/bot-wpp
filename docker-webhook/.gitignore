@@ -41,3 +41,6 @@ env/
 dist/
 build/
 *.egg-info/
+
+# Ignorar arquivos temporários de upload do Google Drive
+**/tmp.driveupload/
