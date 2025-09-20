@@ -1,21 +1,27 @@
-import json
+# src/utils/mongo_client.py
+import os
 from pymongo import MongoClient
+from pymongo.errors import ConnectionFailure
 
-def load_mongo_config(config_file="config/config.json"):
-    """Carrega configurações do MongoDB do config unificado."""
-    with open(config_file, "r") as f:
-        config = json.load(f)
-    mongo_config = config.get("mongo", {})
-    if not mongo_config.get("connectionUri"):
-        raise ValueError("connectionUri não encontrado na seção mongo do config.json")
-    return mongo_config
+def get_mongo_client():
+    """
+    Cria e retorna um cliente do MongoDB e a configuração,
+    lendo as informações das variáveis de ambiente.
+    """
+    mongo_uri = os.getenv("MONGO_URI")
+    if not mongo_uri:
+        raise ValueError("A variável de ambiente MONGO_URI não foi definida.")
 
-def get_mongo_client(config_file="config/config.json"):
-    """Cria e retorna cliente Mongo e config."""
-    mongo_config = load_mongo_config(config_file)
-    client = MongoClient(
-        mongo_config["connectionUri"],
-        tls=True,
-        tlsAllowInvalidCertificates=True  # se necessário para testes
-    )
+    try:
+        client = MongoClient(mongo_uri)
+        # O comando ismaster é uma forma leve de testar a conexão.
+        client.admin.command('ismaster')
+    except ConnectionFailure as e:
+        raise ConnectionFailure(f"Não foi possível conectar ao MongoDB: {e}") from e
+
+    mongo_config = {
+        "db_name": os.getenv("MONGO_DB_NAME", "messages"),
+        "collection_messages": os.getenv("MONGO_COLLECTION_MESSAGES", "raw")
+    }
+    
     return client, mongo_config

@@ -1,6 +1,9 @@
-google-generativeai==0.7.1
-pdfplumber==0.11.1
-pika==1.3.2
-requests==2.32.3
-pymongo==4.6.1
-bson==0.5.10
+# requirements.txt
+google-generativeai
+pika
+pymongo
+requests
+pdfplumber
+python-dotenv  # Para carregar variáveis de ambiente em desenvolvimento
+tenacity       # Para retentativas com backoff exponencial
+python-json-logger # Para logging estruturado

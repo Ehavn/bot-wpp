@@ -1,39 +1,27 @@
-# --- Estágio 1: Builder ---
-# Usa uma imagem completa para instalar as dependências
-FROM python:3.11 as builder
-
-# Define o diretório de trabalho
-WORKDIR /app
-
-# Instala dependências do sistema que podem ser necessárias para compilar pacotes
-RUN apt-get update && apt-get install -y \
-    gcc \
-    libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Instala as dependências Python em um local isolado
-COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix="/install" -r requirements.txt
-
-
-# --- Estágio 2: Final ---
-# Usa uma imagem "slim" para a imagem final, que é muito menor
+# Dockerfile
+# Etapa 1: Usar uma imagem base oficial e leve do Python
 FROM python:3.11-slim
 
-# Define o diretório de trabalho
+# Definir variáveis de ambiente para Python
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+# Definir o diretório de trabalho dentro do container
 WORKDIR /app
 
-# Cria um usuário não-root para rodar a aplicação (boa prática de segurança)
-RUN addgroup --system nonroot && adduser --system --group nonroot
-USER nonroot
+# Copiar o arquivo de dependências primeiro para aproveitar o cache do Docker
+COPY requirements.txt .
 
-# Copia as dependências já instaladas do estágio "builder"
-COPY --from=builder /install /usr/local
+# Instalar as dependências do sistema e do Python
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends gcc && \
+    pip install --no-cache-dir -r requirements.txt && \
+    apt-get purge -y --auto-remove gcc && \
+    rm -rf /var/lib/apt/lists/*
 
-# Copia os arquivos da aplicação
-COPY --chown=nonroot:nonroot config/ ./config/
-COPY --chown=nonroot:nonroot src/ ./src/
-COPY --chown=nonroot:nonroot app.py .
+# Copiar o resto do código da aplicação
+COPY . .
 
-# Comando que inicia a aplicação
+# Comando para executar a aplicação quando o container iniciar
+# O worker será iniciado e ficará escutando a fila do RabbitMQ
 CMD ["python", "app.py"]
