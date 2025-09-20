@@ -1,5 +1,3 @@
-# Arquivo: src/run_preparer_worker.py
-
 from src.services.worker_preparer import WorkerPreparer
 from src.utils.logger import get_logger
 

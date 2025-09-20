@@ -1,27 +1,34 @@
-# Dockerfile
-# Etapa 1: Usar uma imagem base oficial e leve do Python
-FROM python:3.11-slim
+# --- Etapa 1: Build Stage ---
+FROM python:3.11 as builder
 
-# Definir variáveis de ambiente para Python
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
-
-# Definir o diretório de trabalho dentro do container
 WORKDIR /app
 
-# Copiar o arquivo de dependências primeiro para aproveitar o cache do Docker
+# Instala as dependências de compilação
+RUN apt-get update && apt-get install -y --no-install-recommends gcc
+
+# Cria um ambiente virtual
+ENV VIRTUAL_ENV=/app/venv
+RUN python -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# Copia e instala as dependências do Python no ambiente virtual
 COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Instalar as dependências do sistema e do Python
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc && \
-    pip install --no-cache-dir -r requirements.txt && \
-    apt-get purge -y --auto-remove gcc && \
-    rm -rf /var/lib/apt/lists/*
+# --- Etapa 2: Final Stage ---
+# Usamos uma imagem "slim" que é muito menor
+FROM python:3.11-slim
 
-# Copiar o resto do código da aplicação
+WORKDIR /app
+
+# Copia apenas o ambiente virtual com as dependências da etapa de build
+COPY --from=builder /app/venv /app/venv
+
+# Copia o código da aplicação
 COPY . .
 
-# Comando para executar a aplicação quando o container iniciar
-# O worker será iniciado e ficará escutando a fila do RabbitMQ
+# Define o Python do ambiente virtual como o padrão
+ENV PATH="/app/venv/bin:$PATH"
+
+# Comando para executar a aplicação
 CMD ["python", "app.py"]

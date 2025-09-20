@@ -1,4 +1,4 @@
-# src/services/worker_ai.py
+import os # Importar os
 import json
 from datetime import datetime
 from src.utils.rabbit_client import get_rabbit_connection, setup_queues
@@ -11,6 +11,11 @@ class WorkerAI:
         self.pdf_manager = pdf_manager
         self.message_dao = message_dao
         self.logger = get_logger("WorkerAI")
+
+        self.ai_name = os.getenv("AI_NAME", "Assistente")
+        default_prompt = "Você é um assistente de atendimento. Responda às perguntas do usuário com base no histórico."
+        self.system_prompt = os.getenv("AI_SYSTEM_PROMPT", default_prompt)
+        self.logger.info(f"Personalidade da IA carregada. Nome: {self.ai_name}")
         
         try:
             self.rabbit_connection, self.rabbit_config = get_rabbit_connection()
@@ -21,15 +26,7 @@ class WorkerAI:
             raise
 
     def _formatar_historico_para_ia(self, historico_pacote, contexto_pdf, mensagem_atual):
-        # (O prompt pode ser movido para um arquivo/módulo separado de prompts se ficar muito grande)
-        prompt_sistema = """
-        Sua tarefa é atuar como um assistente de atendimento. Você receberá um histórico de chat e uma nova mensagem do usuário. Sua única função é responder à nova mensagem do usuário usando o histórico como contexto.
-
-        REGRAS CRÍTICAS E OBRIGATÓRIAS:
-        1. O histórico fornecido é a única fonte de verdade. Responda a perguntas sobre a conversa passada baseando-se EXCLUSIVAMENTE no texto do histórico.
-        2. É PROIBIDO e uma falha na sua função se você disser que "não tem memória", "não tem acesso a conversas anteriores" ou dar respostas evasivas sobre privacidade. A conversa está sendo fornecida a você para ser usada.
-        3. Responda apenas à última mensagem do usuário.
-        """
+        prompt_sistema = self.system_prompt.format(ai_name=self.ai_name)
         
         if contexto_pdf:
             prompt_sistema += f"\n\n--- CONTEXTO ADICIONAL DE DOCUMENTOS ---\n{contexto_pdf}\n--- FIM DO CONTEXTO ---"
@@ -49,7 +46,8 @@ class WorkerAI:
     def _callback(self, ch, method, properties, body):
         package = {}
         phone_number = "unknown"
-        log_context = {"delivery_tag": method.delivery_tag}
+        trace_id = f"{method.delivery_tag}-{datetime.utcnow().timestamp()}"
+        log_context = {"delivery_tag": method.delivery_tag, "trace_id": trace_id}
 
         try:
             package = json.loads(body)
@@ -81,11 +79,12 @@ class WorkerAI:
             
             ai_message_doc = {
                 "conversationId": phone_number,
-                "from": "chatbot_gemini",
+                "from": self.ai_name, # Usa o nome do AI
                 "text": {"body": bot_resposta},
                 "role": "ia",
                 "status": "processed",
-                "created_at": datetime.utcnow()
+                "created_at": datetime.utcnow(),
+                "trace_id": trace_id # Salva o ID de rastreamento
             }
             self.message_dao.insert_message(ai_message_doc)
             self.logger.info(f"Resposta da IA salva no MongoDB.", extra=log_context)

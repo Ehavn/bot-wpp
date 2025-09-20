@@ -1,5 +1,3 @@
-# Arquivo: src/services/worker_ai.py (Versão Definitiva e Corrigida)
-
 import pika
 import time
 import json
@@ -32,9 +30,6 @@ class WorkerAI:
                 self.channel = self.connection.channel()
                 self.logger.info("Conexão com RabbitMQ estabelecida com sucesso!")
                 
-                # --- A MUDANÇA CRUCIAL ---
-                # Usa a função central para garantir que as filas estão configuradas corretamente
-                # O 'config' é um objeto, não um dicionário, então passamos um mock de config
                 rabbit_config_dict = {
                     "queue_new_messages": config.RABBIT_QUEUE_NEW,
                     "queue_ia_messages": config.RABBIT_QUEUE_IA

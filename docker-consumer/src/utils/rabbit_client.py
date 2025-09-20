@@ -1,5 +1,3 @@
-# Arquivo: src/utils/rabbit_client.py (Resiliente)
-
 import pika
 import json
 import os

@@ -1,5 +1,3 @@
-# Arquivo: docker-compose.override.yml (Apenas para Desenvolvimento)
-
 version: '3.8'
 
 services:

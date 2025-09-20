@@ -1,5 +1,3 @@
-# Arquivo: src/utils/mongo_client.py (Refatorado com config central)
-
 import time
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
@@ -14,11 +12,9 @@ def get_mongo_client():
     last_exception = None
     for attempt in range(max_retries):
         try:
-            # Usa o atributo diretamente do objeto config
             client = MongoClient(config.MONGO_URI, serverSelectionTimeoutMS=5000)
             client.admin.command('ping')
             print("Conexão com MongoDB estabelecida com sucesso.")
-            # Retorna o cliente e um dicionário simples com os outros dados
             mongo_config = {
                 "db_name": config.MONGO_DB_NAME,
                 "collection_raw": config.MONGO_COLLECTION_RAW

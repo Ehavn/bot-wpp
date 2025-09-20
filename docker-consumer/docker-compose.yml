@@ -3,10 +3,9 @@
 services:
   worker_preparer:
     build: .
-    # A lógica de retry no código cuidará de esperar pela conexão.
     environment:
       - MONGO_CONNECTION_URI=${MONGO_CONNECTION_URI}
       - RABBIT_HOST=${RABBIT_HOST}
       - RABBIT_USER=${RABBIT_USER}
       - RABBIT_PASS=${RABBIT_PASS}
-      - APP_ENTRYPOINT=src.run_preparer_worker  # <-- CORRIGIDO
+      - APP_ENTRYPOINT=src.run_preparer_worker 

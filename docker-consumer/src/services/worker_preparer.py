@@ -1,5 +1,3 @@
-# Arquivo: src/services/worker_preparer.py (Corrigido)
-
 import json
 import pika
 import signal
@@ -89,7 +87,6 @@ class WorkerPreparer:
             "current_message": message,
             "history": history
         }
-        # CORREÇÃO: Usa a chave correta 'queue_ia_messages'
         ia_queue = self.rabbit_config.get("queue_ia_messages")
 
         if not ia_queue:
@@ -131,7 +128,6 @@ class WorkerPreparer:
     def run(self):
         self.channel.basic_qos(prefetch_count=1)
         self.channel.basic_consume(
-            # CORREÇÃO: Usa a chave correta 'queue_new_messages'
             queue=self.rabbit_config["queue_new_messages"],
             on_message_callback=self._callback
         )

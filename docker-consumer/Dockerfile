@@ -1,5 +1,3 @@
-# Arquivo: Dockerfile (Para o projeto CONSUMER)
-
 # --- Estágio 1: Build ---
 FROM python:3.11-slim as builder
 

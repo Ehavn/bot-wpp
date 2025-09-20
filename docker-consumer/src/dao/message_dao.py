@@ -1,5 +1,3 @@
-# Arquivo: src/dao/message_dao.py (Otimizado)
-
 from bson import ObjectId
 from datetime import datetime
 

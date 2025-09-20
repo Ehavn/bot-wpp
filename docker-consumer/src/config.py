@@ -1,5 +1,3 @@
-# Arquivo: src/config.py
-
 import os
 import json
 import logging
@@ -46,13 +44,11 @@ class AppConfig:
             self.logger.warning(f"Arquivo de configuração '{config_path}' não encontrado. Usando apenas variáveis de ambiente.")
             config_data = {}
 
-        # MongoDB Config
         mongo_cfg = config_data.get("mongo", {})
         self.MONGO_URI = mongo_cfg.get("connectionUri")
         self.MONGO_DB_NAME = mongo_cfg.get("db_name", "messages")
         self.MONGO_COLLECTION_RAW = mongo_cfg.get("collection_raw", "raw")
 
-        # RABBIT Config
         rabbit_cfg = config_data.get("RABBIT", {})
         self.RABBIT_HOST = rabbit_cfg.get("host", "localhost")
         self.RABBIT_USER = rabbit_cfg.get("user")
@@ -78,5 +74,4 @@ class AppConfig:
         if missing_vars:
             raise ValueError(f"Configurações essenciais ausentes: {', '.join(missing_vars)}. Verifique seu .env ou config.json.")
 
-# Cria uma instância única para ser importada por outros módulos
 config = AppConfig()
