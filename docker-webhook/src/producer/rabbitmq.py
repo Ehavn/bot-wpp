@@ -5,7 +5,6 @@ import logging
 import time
 from dotenv import load_dotenv
 
-# Carrega as variáveis de ambiente do arquivo .env
 load_dotenv()
 
 logger = logging.getLogger(__name__)
@@ -70,7 +69,6 @@ class RabbitMQProducer:
         """
         for attempt in range(max_retries):
             try:
-                # Verifica a conexão antes de tentar publicar
                 if not self._connection or self._connection.is_closed or not self._channel or self._channel.is_closed:
                     logger.warning("Conexão com RabbitMQ perdida ou fechada, tentando reconectar...")
                     self.connect()
@@ -97,7 +95,7 @@ class RabbitMQProducer:
                     extra={'error_message': str(e), 'error_type': type(e).__name__}
                 )
             
-            time.sleep(1) # Espera um pouco antes de tentar novamente
+            time.sleep(1) 
 
         logger.critical(
             "Não foi possível publicar a mensagem após várias tentativas.",

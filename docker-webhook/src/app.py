@@ -10,24 +10,19 @@ from .utils.logger import get_logger
 from .producer.rabbitmq import RabbitMQProducer
 from .utils.validators import validate_whatsapp_payload
 
-# Carrega variáveis de ambiente do arquivo .env
 load_dotenv()
 
-# Configura o logger para este arquivo
 logger = get_logger(__name__)
 
-# Inicializa a aplicação Flask
 app = Flask(__name__)
 
-# --- Configuração do Rate Limiter (Ajustado) ---
 limiter = Limiter(
     get_remote_address, # Usa o endereço de IP como chave
     app=app,
-    default_limits=["20 per second"], # Define o limite padrão para 20 requisições por segundo
+    default_limits=["20 per second"], # Essa definição é por máqui, tendo 3 seriam 60 requisições
     storage_uri=os.getenv("RATE_LIMIT_STORAGE_URI", "memory://")
 )
 
-# Tenta carregar as configurações essenciais e conectar ao RabbitMQ ao iniciar
 try:
     VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
     APP_SECRET = os.getenv("APP_SECRET")
