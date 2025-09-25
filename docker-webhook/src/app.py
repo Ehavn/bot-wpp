@@ -98,8 +98,8 @@ def whatsapp_webhook():
             return jsonify({"error": "Payload JSON inválido"}), 400
 
         try:
-            # 1. Extrai a lista de mensagens do payload
-            messages_to_publish = dados["value"]["messages"]
+            # 1. Extrai a lista de mensagens usando o caminho correto e completo
+            messages_to_publish = dados['entry'][0]['changes'][0]['value']['messages']
 
             # 2. Publica a LISTA inteira como uma única mensagem
             rabbit_producer.publish(messages_to_publish)

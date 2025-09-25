@@ -31,4 +31,4 @@ COPY . .
 ENV PATH="/app/venv/bin:$PATH"
 
 # Comando para executar a aplicação
-CMD ["python", "app.py"]
+CMD python -m src.app

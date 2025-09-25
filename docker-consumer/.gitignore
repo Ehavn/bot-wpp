@@ -43,5 +43,6 @@ build/
 *.egg-info/
 
 # Ignorar arquivos temporários de upload do Google Drive
+.tmp.driveupload/
 ./.tmp.driveupload/
 **/tmp.driveupload/

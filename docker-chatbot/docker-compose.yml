@@ -4,48 +4,25 @@ version: '3.8'
 services:
   # Serviço da sua aplicação Python
   app:
-    build: . # Constrói a imagem a partir do Dockerfile na pasta atual
-    container_name: chatbot_app
-    # O 'depends_on' garante que o RabbitMQ e o Mongo iniciem antes da sua aplicação
-    depends_on:
-      - rabbitmq
-      - mongo
-    # Carrega as variáveis de ambiente do arquivo .env
+    build: .
+    container_name: chatbot_consumer_app # Mudei o nome para ser mais específico
+    # REMOVIDO: depends_on, pois o RabbitMQ agora é externo
     env_file:
       - ./.env
-    # 'volumes' espelha seu código local para dentro do container,
-    # assim você não precisa reconstruir a imagem a cada mudança no código.
-    volumes:
-      - .:/app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
-  # Serviço do RabbitMQ
-  rabbitmq:
-    image: rabbitmq:3-management # Usamos a imagem com a interface de gerenciamento
-    container_name: rabbitmq_broker
-    environment:
-      # As credenciais devem ser as mesmas do seu arquivo .env
-      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
-      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
-    ports:
-      # Porta do protocolo AMQP
-      - "5672:5672"
-      # Porta da interface web de gerenciamento (acesse em http://localhost:15672)
-      - "15672:15672"
-
-  # Serviço do MongoDB
+  # Serviço do MongoDB (PODE SER REMOVIDO TAMBÉM SE FOR EXTERNO)
   mongo:
     image: mongo:latest
-    container_name: mongo_db
+    container_name: mongo_db_chatbot # Nome específico
     environment:
-      # As credenciais devem ser as mesmas da sua MONGO_URI no .env
-      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER} # Você precisará adicionar esta variável ao .env
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD} # E esta também
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD}
     ports:
       - "27017:27017"
     volumes:
-      # Garante que os dados do MongoDB persistam mesmo se o container for recriado
       - mongodata:/data/db
 
-# Define o volume nomeado para persistência de dados do MongoDB
 volumes:
   mongodata:
