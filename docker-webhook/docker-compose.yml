@@ -1,27 +1,10 @@
 services:
-  rabbitmq:
-    image: rabbitmq:3.11-management
-    container_name: rabbitmq
-    hostname: rabbitmq
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    environment:
-      - RABBITMQ_DEFAULT_USER=${RABBIT_USER}
-      - RABBITMQ_DEFAULT_PASS=${RABBIT_PASS}
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   webapp:
     build: .
     container_name: whatsapp_webhook
     ports:
       - "${PORT}:${PORT}"
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
     env_file:
       - ./.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
