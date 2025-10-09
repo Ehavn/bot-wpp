@@ -15,29 +15,34 @@ def get_rabbit_connection():
     connection = pika.BlockingConnection(parameters)
     return connection, rabbit_config
 
-def setup_queues(channel, config):
+def setup_queues_and_exchanges(channel, config):
     """
-    Garante que a fila principal, a Dead-Letter Exchange (DLX) e a Dead-Letter Queue (DLQ)
-    existam e estejam corretamente vinculadas.
+    Garante que a exchange principal (com capacidade de atraso) e as filas
+    necessárias (principal e DLQ) existam e estejam vinculadas.
     """
     main_queue = config["queue"]
-    dlx_name = "dlx_exchange"
     dlq_name = f"{main_queue}-dlq"
-
-    # Declara o exchange para mensagens mortas (DLX)
+    
+    # Exchange para mensagens mortas (DLQ)
+    dlx_name = "dlx_exchange"
     channel.exchange_declare(exchange=dlx_name, exchange_type='fanout', durable=False)
-    
-    # Declara a fila de mensagens mortas (DLQ)
     channel.queue_declare(queue=dlq_name, durable=True)
-    
-    # Vincula a DLQ ao DLX
-    channel.queue_bind(queue=dlq_name, exchange=dlx_name, routing_key='')
+    channel.queue_bind(queue=dlq_name, exchange=dlx_name)
 
-    # Declara a fila principal, configurando-a para enviar mensagens mortas ao DLX
-    args = {
-        "x-dead-letter-exchange": dlx_name
-    }
+    main_exchange = 'delayed_exchange'
+    args = {"x-delayed-type": "direct"}
     
-    channel.queue_declare(queue=main_queue, durable=True, arguments=args)
+    channel.exchange_declare(
+        exchange=main_exchange, 
+        exchange_type='x-delayed-message', 
+        durable=True, 
+        auto_delete=False, 
+        arguments=args
+    )
+
+    queue_args = {"x-dead-letter-exchange": dlx_name}
+    channel.queue_declare(queue=main_queue, durable=True, arguments=queue_args)
+
+    channel.queue_bind(queue=main_queue, exchange=main_exchange, routing_key=main_queue)
     
-    print(f"✅ Fila principal '{main_queue}' e DLQ '{dlq_name}' configuradas com sucesso.")
+    print(f"✅ Exchange Atrasada '{main_exchange}' e Fila Principal '{main_queue}' configuradas com sucesso.")

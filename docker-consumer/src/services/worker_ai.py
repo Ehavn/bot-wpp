@@ -1,25 +1,24 @@
+# Arquivo: src/services/worker_ai.py (Padronizado)
 import pika
 import time
 import json
 from src.utils.logger import get_logger
 from src.config import config
-# Importa a mesma função de setup usada pelo outro worker
 from src.utils.rabbit_client import setup_queues
 
 class WorkerAI:
     def __init__(self):
         self.logger = get_logger("WorkerAI_Service")
-        self.rabbit_host = config.RABBIT_HOST
-        self.rabbit_user = config.RABBIT_USER
-        self.rabbit_password = config.RABBIT_PASS
-        # O nome da fila vem do config central
-        self.queue_name = config.RABBIT_QUEUE_IA
+        # CORREÇÃO AQUI
+        self.rabbit_host = config.RABBITMQ_HOST
+        self.rabbit_user = config.RABBITMQ_USER
+        self.rabbit_password = config.RABBITMQ_PASSWORD
+        self.queue_name = config.RABBITMQ_QUEUE_IA
         self.connection = None
         self.channel = None
         self.logger.info("Worker AI instanciado.")
 
     def _connect(self):
-        """Tenta se conectar ao RabbitMQ com retries."""
         credentials = pika.PlainCredentials(self.rabbit_user, self.rabbit_password)
         while True:
             try:
@@ -30,9 +29,10 @@ class WorkerAI:
                 self.channel = self.connection.channel()
                 self.logger.info("Conexão com RabbitMQ estabelecida com sucesso!")
                 
+                # Usa os atributos padronizados para o setup
                 rabbit_config_dict = {
-                    "queue_new_messages": config.RABBIT_QUEUE_NEW,
-                    "queue_ia_messages": config.RABBIT_QUEUE_IA
+                    "queue_new_messages": config.RABBITMQ_QUEUE_NEW,
+                    "queue_ia_messages": config.RABBITMQ_QUEUE_IA
                 }
                 setup_queues(self.channel, rabbit_config_dict)
                 
@@ -42,7 +42,6 @@ class WorkerAI:
                 time.sleep(5)
 
     def _callback(self, ch, method, properties, body):
-        """Esta função é chamada sempre que uma mensagem é recebida."""
         self.logger.info(f" [x] Pacote recebido da fila '{self.queue_name}': {body.decode()}")
         try:
             package = json.loads(body)
@@ -53,7 +52,6 @@ class WorkerAI:
             ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def run(self):
-        """Este método se conecta e inicia o consumo da fila da IA."""
         self._connect()
         self.channel.basic_qos(prefetch_count=1)
         self.channel.basic_consume(queue=self.queue_name, on_message_callback=self._callback)

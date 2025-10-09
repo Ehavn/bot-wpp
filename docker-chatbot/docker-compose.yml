@@ -1,21 +1,17 @@
-# docker-compose.yml
-version: '3.8'
-
 services:
-  # Serviço da sua aplicação Python
   app:
     build: .
-    container_name: chatbot_consumer_app # Mudei o nome para ser mais específico
-    # REMOVIDO: depends_on, pois o RabbitMQ agora é externo
+    container_name: chatbot_consumer_app
     env_file:
       - ./.env
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    networks:
+      - chatbot_corretora 
+      - default
+    restart: unless-stopped 
 
-  # Serviço do MongoDB (PODE SER REMOVIDO TAMBÉM SE FOR EXTERNO)
   mongo:
     image: mongo:latest
-    container_name: mongo_db_chatbot # Nome específico
+    container_name: mongo_db_chatbot
     environment:
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER}
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD}
@@ -23,6 +19,13 @@ services:
       - "27017:27017"
     volumes:
       - mongodata:/data/db
+    networks:
+      - default 
+networks:
+  chatbot_corretora:
+    external: true 
+  default:
+    driver: bridge
 
 volumes:
   mongodata:

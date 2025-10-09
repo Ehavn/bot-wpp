@@ -1,38 +1,31 @@
+# Arquivo: src/utils/rabbit_client.py (Refatorado e Padronizado)
 import pika
-import json
-import os
 import time
 from pika.exceptions import AMQPConnectionError
-
-def load_config():
-    config_path = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'config.json')
-    try:
-        with open(config_path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        raise FileNotFoundError("ERRO: O arquivo 'config/config.json' não foi encontrado.")
+from src.config import config # Usa a configuração central
 
 def get_rabbit_connection():
-    config = load_config()
-    rabbit_config = config.get("rabbitmq", {})
-    
-    host = os.getenv("RABBIT_HOST", rabbit_config.get("host", "localhost"))
-    user = os.getenv("RABBIT_USER", rabbit_config.get("user"))
-    password = os.getenv("RABBIT_PASSWORD", rabbit_config.get("password"))
-    
-    if not user or not password:
-        raise ValueError("Credenciais do RabbitMQ não definidas.")
-
-    credentials = pika.PlainCredentials(user, password)
-    parameters = pika.ConnectionParameters(host=host, credentials=credentials, connection_attempts=5, retry_delay=5)
-
     max_retries = 5
     last_exception = None
     for attempt in range(max_retries):
         try:
+            # Usa os atributos padronizados do objeto config
+            credentials = pika.PlainCredentials(config.RABBITMQ_USER, config.RABBITMQ_PASSWORD)
+            parameters = pika.ConnectionParameters(
+                host=config.RABBITMQ_HOST,
+                credentials=credentials,
+                connection_attempts=5,
+                retry_delay=5
+            )
             connection = pika.BlockingConnection(parameters)
-            print("Conexão com RabbitMQ estabelecida com sucesso.")
-            return connection, rabbit_config
+            print(f"Conexão com RabbitMQ estabelecida com sucesso em '{config.RABBITMQ_HOST}'.")
+            
+            # Retorna um dicionário simples com os nomes das filas
+            rabbit_config_dict = {
+                "queue_new_messages": config.RABBITMQ_QUEUE_NEW,
+                "queue_ia_messages": config.RABBITMQ_QUEUE_IA
+            }
+            return connection, rabbit_config_dict
         except AMQPConnectionError as e:
             last_exception = e
             wait_time = 2 ** attempt
@@ -48,6 +41,8 @@ def setup_queues(channel, config):
     channel.queue_declare(queue=dead_letter_queue_name, durable=True)
     channel.queue_bind(exchange=dlx_exchange_name, queue=dead_letter_queue_name)
     queue_args = {"x-dead-letter-exchange": dlx_exchange_name}
+    
+    # Usa as chaves corretas do dicionário de configuração
     channel.queue_declare(queue=config["queue_new_messages"], durable=True, arguments=queue_args)
     channel.queue_declare(queue=config["queue_ia_messages"], durable=True, arguments=queue_args)
     print("Filas e Dead Letter Exchange verificadas/criadas com sucesso.")

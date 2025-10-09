@@ -1,0 +1,24 @@
+services:
+  rabbitmq:
+    # ALTERADO: Em vez de 'image', usamos 'build'
+    build: .
+    container_name: rabbitmq
+    hostname: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBIT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBIT_PASS}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - app-network
+
+volumes:
+  rabbitmq_data:
+
+networks:
+  app-network:
+    driver: bridge
+    name: chatbot_corretora
